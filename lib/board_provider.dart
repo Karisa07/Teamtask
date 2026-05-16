@@ -1,0 +1,145 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:teamtask/auth_provider.dart';
+import 'package:teamtask/board_repository.dart';
+
+// Provider del repositorio
+final boardRepositoryProvider = Provider<BoardRepository>((ref) {
+  return BoardRepository(ref.watch(supabaseClientProvider));
+});
+
+// Provider de lista de tableros
+final boardsProvider = FutureProvider<List<Board>>((ref) async {
+  final userId = ref.watch(currentUserProvider)?.id;
+  if (userId == null) return [];
+  final repo = ref.watch(boardRepositoryProvider);
+  return repo.getBoards(userId);
+});
+
+// Provider para crear tablero
+final createBoardProvider = Provider<CreateBoardService>((ref) {
+  return CreateBoardService(
+    ref.watch(boardRepositoryProvider),
+    ref.watch(currentUserProvider)?.id ?? '',
+    ref,
+  );
+});
+
+class CreateBoardService {
+  final BoardRepository _repo;
+  final String _userId;
+  final Ref _ref;
+
+  CreateBoardService(this._repo, this._userId, this._ref);
+
+  Future<void> call({
+    required String name,
+    String? description,
+    required String emoji,
+  }) async {
+    await _repo.createBoard(
+      name: name,
+      description: description,
+      emoji: emoji,
+      userId: _userId,
+    );
+    _ref.invalidate(boardsProvider);
+  }
+}
+
+// Stream de tareas en tiempo real
+final tasksStreamProvider =
+    StreamProvider.family<List<Task>, String>((ref, boardId) {
+  final repo = ref.watch(boardRepositoryProvider);
+  return repo.watchTasks(boardId);
+});
+
+// Tareas filtradas por estado
+final tasksByStatusProvider =
+    Provider.family<Map<String, List<Task>>, String>((ref, boardId) {
+  final tasks = ref.watch(tasksStreamProvider(boardId)).valueOrNull ?? [];
+  return {
+    'pending': tasks.where((t) => t.isPending).toList(),
+    'in_progress': tasks.where((t) => t.isInProgress).toList(),
+    'completed': tasks.where((t) => t.isCompleted).toList(),
+  };
+});
+
+// Estadísticas del tablero
+class BoardStats {
+  final int total;
+  final int completed;
+  final int inProgress;
+  final int pending;
+  final double percentage;
+
+  BoardStats({
+    required this.total,
+    required this.completed,
+    required this.inProgress,
+    required this.pending,
+    required this.percentage,
+  });
+}
+
+final boardStatsProvider =
+    Provider.family<BoardStats, String>((ref, boardId) {
+  final tasks = ref.watch(tasksStreamProvider(boardId)).valueOrNull ?? [];
+  final total = tasks.length;
+  final completed = tasks.where((t) => t.isCompleted).length;
+  final inProgress = tasks.where((t) => t.isInProgress).length;
+  final pending = tasks.where((t) => t.isPending).length;
+
+  return BoardStats(
+    total: total,
+    completed: completed,
+    inProgress: inProgress,
+    pending: pending,
+    percentage: total == 0 ? 0.0 : completed / total,
+  );
+});
+
+// Acciones sobre tareas
+final taskActionsProvider =
+    Provider.family<TaskActions, String>((ref, boardId) {
+  return TaskActions(
+    repo: ref.watch(boardRepositoryProvider),
+    userId: ref.watch(currentUserProvider)?.id ?? '',
+    boardId: boardId,
+  );
+});
+
+class TaskActions {
+  final BoardRepository _repo;
+  final String _userId;
+  final String _boardId;
+
+  TaskActions({
+    required BoardRepository repo,
+    required String userId,
+    required String boardId,
+  })  : _repo = repo,
+        _userId = userId,
+        _boardId = boardId;
+
+  Future<void> createTask({
+    required String title,
+    String? description,
+    String priority = 'medium',
+  }) async {
+    await _repo.createTask(
+      boardId: _boardId,
+      title: title,
+      description: description,
+      priority: priority,
+      userId: _userId,
+    );
+  }
+
+  Future<void> updateStatus(String taskId, String newStatus) async {
+    await _repo.updateTaskStatus(taskId, newStatus);
+  }
+
+  Future<void> deleteTask(String taskId) async {
+    await _repo.deleteTask(taskId);
+  }
+}
