@@ -105,6 +105,7 @@ final taskActionsProvider =
     repo: ref.watch(boardRepositoryProvider),
     userId: ref.watch(currentUserProvider)?.id ?? '',
     boardId: boardId,
+    ref: ref,
   );
 });
 
@@ -112,14 +113,17 @@ class TaskActions {
   final BoardRepository _repo;
   final String _userId;
   final String _boardId;
+  final Ref _ref;
 
   TaskActions({
     required BoardRepository repo,
     required String userId,
     required String boardId,
+    required Ref ref,
   })  : _repo = repo,
         _userId = userId,
-        _boardId = boardId;
+        _boardId = boardId,
+        _ref = ref;
 
   Future<void> createTask({
     required String title,
@@ -133,13 +137,16 @@ class TaskActions {
       priority: priority,
       userId: _userId,
     );
+    _ref.invalidate(tasksStreamProvider(_boardId));
   }
 
   Future<void> updateStatus(String taskId, String newStatus) async {
     await _repo.updateTaskStatus(taskId, newStatus);
+    _ref.invalidate(tasksStreamProvider(_boardId));
   }
 
   Future<void> deleteTask(String taskId) async {
     await _repo.deleteTask(taskId);
+    _ref.invalidate(tasksStreamProvider(_boardId));
   }
 }
