@@ -150,7 +150,7 @@ class BoardsListPage extends ConsumerWidget {
   }
 }
 
-// ── BoardCard ────────────────────────────────────────────
+// BoardCard 
 class BoardCard extends StatelessWidget {
   final Board board;
   final VoidCallback onTap;
@@ -255,7 +255,7 @@ class BoardCard extends StatelessWidget {
   }
 }
 
-// ── Empty state ──────────────────────────────────────────
+//Empty state 
 class _EmptyBoards extends StatelessWidget {
   const _EmptyBoards();
 
@@ -294,7 +294,7 @@ class _EmptyBoards extends StatelessWidget {
   }
 }
 
-// ── Skeleton ─────────────────────────────────────────────
+//  Skeleton 
 class _BoardsSkeleton extends StatelessWidget {
   const _BoardsSkeleton();
 

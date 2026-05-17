@@ -89,16 +89,41 @@ class BoardRepository {
   BoardRepository(this._client);
 
   // Obtener todos los tableros del usuario
-  Future<List<Board>> getBoards(String userId) async {
-    final response = await _client
-        .from(SupabaseConstants.boardsTable)
-        .select('*')
-        .eq('created_by', userId)
-        .order('created_at', ascending: false);
+ Future<List<Board>> getBoards(String userId) async {
+  final boardsResponse = await _client
+      .from('boards')
+      .select('*')
+      .eq('created_by', userId)
+      .order('created_at', ascending: false);
 
-    return (response as List).map((json) => Board.fromJson(json)).toList();
+  final boards = boardsResponse as List;
+  final result = <Board>[];
+
+  for (final boardJson in boards) {
+    final tasksResponse = await _client
+        .from('tasks')
+        .select('status')
+        .eq('board_id', boardJson['id']);
+
+    final tasks = tasksResponse as List;
+    final taskCount = tasks.length;
+    final completedCount =
+        tasks.where((t) => t['status'] == 'completed').length;
+
+    result.add(Board(
+      id: boardJson['id'],
+      name: boardJson['name'],
+      description: boardJson['description'],
+      emoji: boardJson['emoji'] ?? '📋',
+      createdBy: boardJson['created_by'],
+      createdAt: DateTime.parse(boardJson['created_at']),
+      taskCount: taskCount,
+      completedCount: completedCount,
+    ));
   }
 
+  return result;
+}
   // Crear un tablero
   Future<Board> createBoard({
     required String name,
@@ -177,16 +202,11 @@ class BoardRepository {
   }
 
   // Stream de tareas en tiempo real
-  Stream<List<Task>> watchTasks(String boardId) async* {
-    final initialTasks = await getTasks(boardId);
-    yield initialTasks;
-
-    await for (final _ in _client
-        .from(SupabaseConstants.tasksTable)
-        .stream(primaryKey: ['id'])
-        .eq('board_id', boardId)) {
-      final updatedTasks = await getTasks(boardId);
-      yield updatedTasks;
-    }
-  }
+  Stream<List<Task>> watchTasks(String boardId) {
+  return _client
+      .from('tasks')
+      .stream(primaryKey: ['id'])
+      .eq('board_id', boardId)
+      .map((data) => data.map((json) => Task.fromJson(json)).toList());
+}
 }
