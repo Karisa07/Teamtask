@@ -223,8 +223,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: _register, // 👈 sin deshabilitar por ahora
-                        child: _loadingEmail
+                        onPressed: _register,
+                          child: _loadingEmail
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,

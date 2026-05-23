@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:teamtask/constants/supabase_constants.dart';
 
@@ -88,43 +89,44 @@ class BoardRepository {
 
   BoardRepository(this._client);
 
-  // Obtener todos los tableros del usuario
- Future<List<Board>> getBoards(String userId) async {
-  final boardsResponse = await _client
-      .from('boards')
-      .select('*')
-      .eq('created_by', userId)
-      .order('created_at', ascending: false);
+  // Tableros
 
-  final boards = boardsResponse as List;
-  final result = <Board>[];
+  Future<List<Board>> getBoards(String userId) async {
+    final boardsResponse = await _client
+        .from('boards')
+        .select('*')
+        .eq('created_by', userId)
+        .order('created_at', ascending: false);
 
-  for (final boardJson in boards) {
-    final tasksResponse = await _client
-        .from('tasks')
-        .select('status')
-        .eq('board_id', boardJson['id']);
+    final boards = boardsResponse as List;
+    final result = <Board>[];
 
-    final tasks = tasksResponse as List;
-    final taskCount = tasks.length;
-    final completedCount =
-        tasks.where((t) => t['status'] == 'completed').length;
+    for (final boardJson in boards) {
+      final tasksResponse = await _client
+          .from('tasks')
+          .select('status')
+          .eq('board_id', boardJson['id']);
 
-    result.add(Board(
-      id: boardJson['id'],
-      name: boardJson['name'],
-      description: boardJson['description'],
-      emoji: boardJson['emoji'] ?? '📋',
-      createdBy: boardJson['created_by'],
-      createdAt: DateTime.parse(boardJson['created_at']),
-      taskCount: taskCount,
-      completedCount: completedCount,
-    ));
+      final tasks = tasksResponse as List;
+      final taskCount = tasks.length;
+      final completedCount =
+          tasks.where((t) => t['status'] == 'completed').length;
+
+      result.add(Board(
+        id: boardJson['id'],
+        name: boardJson['name'],
+        description: boardJson['description'],
+        emoji: boardJson['emoji'] ?? '📋',
+        createdBy: boardJson['created_by'],
+        createdAt: DateTime.parse(boardJson['created_at']),
+        taskCount: taskCount,
+        completedCount: completedCount,
+      ));
+    }
+
+    return result;
   }
 
-  return result;
-}
-  // Crear un tablero
   Future<Board> createBoard({
     required String name,
     String? description,
@@ -145,7 +147,8 @@ class BoardRepository {
     return Board.fromJson(response);
   }
 
-  // Obtener tareas de un tablero
+  // Tareas 
+
   Future<List<Task>> getTasks(String boardId) async {
     final response = await _client
         .from(SupabaseConstants.tasksTable)
@@ -156,7 +159,6 @@ class BoardRepository {
     return (response as List).map((json) => Task.fromJson(json)).toList();
   }
 
-  // Crear una tarea
   Future<Task> createTask({
     required String boardId,
     required String title,
@@ -179,7 +181,6 @@ class BoardRepository {
     return Task.fromJson(response);
   }
 
-  // Actualizar estado de una tarea
   Future<void> updateTaskStatus(String taskId, String newStatus) async {
     await _client
         .from(SupabaseConstants.tasksTable)
@@ -193,7 +194,6 @@ class BoardRepository {
         .eq('id', taskId);
   }
 
-  // Eliminar tarea
   Future<void> deleteTask(String taskId) async {
     await _client
         .from(SupabaseConstants.tasksTable)
@@ -201,12 +201,16 @@ class BoardRepository {
         .eq('id', taskId);
   }
 
-  // Stream de tareas en tiempo real
+  // Realtime
+
   Stream<List<Task>> watchTasks(String boardId) {
-  return _client
-      .from('tasks')
-      .stream(primaryKey: ['id'])
-      .eq('board_id', boardId)
-      .map((data) => data.map((json) => Task.fromJson(json)).toList());
-}
+    return _client
+        .from('tasks')
+        .stream(primaryKey: ['id'])
+        .eq('board_id', boardId)
+        .map((data) => data.map((json) => Task.fromJson(json)).toList())
+        .handleError((error) {
+          debugPrint('🔴 Realtime error: $error - reconectando...');
+        });
+  }
 }

@@ -87,8 +87,6 @@ class AuthService {
   }
 
   //      OAuth: Apple                                                 
-  /// Apple Sign In solo funciona en dispositivos iOS/macOS reales
-  /// con un Apple Developer Account configurado.
   Future<void> signInWithApple() async {
     await _client.auth.signInWithOAuth(
       OAuthProvider.apple,

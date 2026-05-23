@@ -5,8 +5,6 @@ import 'package:gap/gap.dart';
 import 'package:teamtask/auth_provider.dart';
 import 'package:teamtask/app_theme.dart';
 
-/// Pantalla temporal que confirma que el login funcionó.
-/// En el proyecto completo esta sería la BoardsListPage.
 class HomePlaceholderPage extends ConsumerWidget {
   const HomePlaceholderPage({super.key});
 
