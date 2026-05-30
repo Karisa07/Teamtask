@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
+import 'package:go_router/go_router.dart';
 import 'package:teamtask/board_provider.dart';
 import 'package:teamtask/board_repository.dart';
+import 'package:teamtask/profile_provider.dart';
+import 'package:teamtask/auth_provider.dart';
 import 'package:teamtask/app_theme.dart';
 import 'package:teamtask/screens/create_task_sheet.dart';
-import 'package:go_router/go_router.dart';
 
 class BoardDetailPage extends ConsumerWidget {
   final String boardId;
@@ -18,19 +21,158 @@ class BoardDetailPage extends ConsumerWidget {
     required this.boardName,
   });
 
+  void _showInviteCode(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(boardRepositoryProvider);
+    final code = await repo.getInviteCode(boardId);
+
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Gap(20),
+            const Icon(Icons.group_add_outlined,
+                size: 40, color: AppTheme.primaryColor),
+            const Gap(12),
+            const Text(
+              'Código de invitación',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const Gap(6),
+            Text(
+              'Comparte este código para que otros\nse unan al tablero',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+            ),
+            const Gap(24),
+
+            // Código grande
+            GestureDetector(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: code ?? ''));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Código copiado al portapapeles'),
+                    backgroundColor: AppTheme.successColor,
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 32, vertical: 20),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withOpacity(0.2),
+                    width: 2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      code ?? '------',
+                      style: const TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 10,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                    const Gap(12),
+                    const Icon(Icons.copy,
+                        color: AppTheme.primaryColor, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            const Gap(12),
+            Text(
+              'Toca el código para copiarlo',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+            ),
+            const Gap(24),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tasksAsync = ref.watch(tasksStreamProvider(boardId));
     final stats = ref.watch(boardStatsProvider(boardId));
     final tasksByStatus = ref.watch(tasksByStatusProvider(boardId));
+    final profileAsync = ref.watch(profileProvider);
+    final currentUser = ref.watch(currentUserProvider);
 
-   return Scaffold(
+    // Verificar si el usuario actual es el dueño
+    final boardsAsync = ref.watch(boardsProvider);
+    final isOwner = boardsAsync.valueOrNull
+            ?.firstWhere(
+              (b) => b.id == boardId,
+              orElse: () => Board(
+                id: '', name: '', emoji: '',
+                createdBy: '', createdAt: DateTime.now(),
+              ),
+            )
+            .createdBy ==
+        currentUser?.id;
+
+    return Scaffold(
       appBar: AppBar(
-        leading: BackButton(
-          onPressed: () => context.go('/boards'),
-        ),
+        leading: BackButton(onPressed: () => context.pop()),
         title: Text(boardName),
         actions: [
+          // Botón de invitación (solo para el dueño)
+          if (isOwner)
+            IconButton(
+              onPressed: () => _showInviteCode(context, ref),
+              icon: const Icon(Icons.group_add_outlined),
+              tooltip: 'Código de invitación',
+            ),
+
+          // Avatar
+          GestureDetector(
+            onTap: () => context.push('/profile'),
+            child: CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.primaryColor,
+              backgroundImage: profileAsync.valueOrNull?.avatarUrl != null
+                  ? NetworkImage(profileAsync.valueOrNull!.avatarUrl!)
+                  : null,
+              child: profileAsync.valueOrNull?.avatarUrl == null
+                  ? Text(
+                      (profileAsync.valueOrNull?.fullName?.isNotEmpty == true)
+                          ? profileAsync.valueOrNull!.fullName![0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+          const Gap(8),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: _RealtimeIndicator(isConnected: tasksAsync.hasValue),
@@ -106,7 +248,8 @@ class BoardDetailPage extends ConsumerWidget {
 
           Expanded(
             child: tasksAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (_) => ListView(
                 scrollDirection: Axis.horizontal,
@@ -158,6 +301,8 @@ class BoardDetailPage extends ConsumerWidget {
   }
 }
 
+// ── Clases sin cambios ────────────────────────────────────
+
 class _KanbanColumn extends ConsumerWidget {
   final String boardId;
   final String status;
@@ -183,7 +328,8 @@ class _KanbanColumn extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
@@ -275,7 +421,8 @@ class _TaskCard extends ConsumerWidget {
           color: AppTheme.errorColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Icon(Icons.delete_outline, color: AppTheme.errorColor),
+        child:
+            const Icon(Icons.delete_outline, color: AppTheme.errorColor),
       ),
       confirmDismiss: (_) async {
         return await showDialog<bool>(
@@ -290,10 +437,8 @@ class _TaskCard extends ConsumerWidget {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Eliminar',
-                  style: TextStyle(color: AppTheme.errorColor),
-                ),
+                child: const Text('Eliminar',
+                    style: TextStyle(color: AppTheme.errorColor)),
               ),
             ],
           ),
@@ -367,7 +512,8 @@ class _TaskCard extends ConsumerWidget {
                     decoration: task.isCompleted
                         ? TextDecoration.lineThrough
                         : null,
-                    color: task.isCompleted ? Colors.grey.shade400 : null,
+                    color:
+                        task.isCompleted ? Colors.grey.shade400 : null,
                   ),
                 ),
                 if (task.description != null) ...[
@@ -405,8 +551,7 @@ class _TaskCard extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               decoration: BoxDecoration(
                 color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
@@ -445,7 +590,6 @@ class _TaskCard extends ConsumerWidget {
               },
             ),
             const Gap(8),
-            // 
             ListTile(
               leading: const Icon(Icons.delete_outline,
                   color: AppTheme.errorColor),
@@ -453,7 +597,8 @@ class _TaskCard extends ConsumerWidget {
                   style: TextStyle(color: AppTheme.errorColor)),
               onTap: () {
                 Navigator.pop(ctx);
-                Future.delayed(const Duration(milliseconds: 300), () async {
+                Future.delayed(const Duration(milliseconds: 300),
+                    () async {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (d) => AlertDialog(
@@ -467,7 +612,8 @@ class _TaskCard extends ConsumerWidget {
                         TextButton(
                           onPressed: () => Navigator.pop(d, true),
                           child: const Text('Eliminar',
-                              style: TextStyle(color: AppTheme.errorColor)),
+                              style:
+                                  TextStyle(color: AppTheme.errorColor)),
                         ),
                       ],
                     ),

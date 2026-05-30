@@ -2,12 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:teamtask/auth_provider.dart';
 import 'package:teamtask/board_repository.dart';
 
-// Provider del repositorio
 final boardRepositoryProvider = Provider<BoardRepository>((ref) {
   return BoardRepository(ref.watch(supabaseClientProvider));
 });
 
-// Provider de lista de tableros
 final boardsProvider = FutureProvider<List<Board>>((ref) async {
   final userId = ref.watch(currentUserProvider)?.id;
   if (userId == null) return [];
@@ -15,7 +13,6 @@ final boardsProvider = FutureProvider<List<Board>>((ref) async {
   return repo.getBoards(userId);
 });
 
-// Provider para crear tablero
 final createBoardProvider = Provider<CreateBoardService>((ref) {
   return CreateBoardService(
     ref.watch(boardRepositoryProvider),
@@ -46,14 +43,43 @@ class CreateBoardService {
   }
 }
 
-// Stream de tareas en tiempo real
+// ── Unirse a tablero ──────────────────────────────────────
+
+final joinBoardProvider = Provider<JoinBoardService>((ref) {
+  return JoinBoardService(
+    ref.watch(boardRepositoryProvider),
+    ref.watch(currentUserProvider)?.id ?? '',
+    ref,
+  );
+});
+
+class JoinBoardService {
+  final BoardRepository _repo;
+  final String _userId;
+  final Ref _ref;
+
+  JoinBoardService(this._repo, this._userId, this._ref);
+
+  Future<Board> call(String code) async {
+    final board = await _repo.joinBoardByCode(
+      code: code,
+      userId: _userId,
+    );
+    _ref.invalidate(boardsProvider);
+    return board;
+  }
+}
+
+// ── Stream realtime de tareas ─────────────────────────────
+
 final tasksStreamProvider =
-    StreamProvider.family<List<Task>, String>((ref, boardId) {
+    StreamProvider.autoDispose.family<List<Task>, String>((ref, boardId) {
   final repo = ref.watch(boardRepositoryProvider);
   return repo.watchTasks(boardId);
 });
 
-// Tareas filtradas por estado
+// ── Tareas agrupadas por estado ───────────────────────────
+
 final tasksByStatusProvider =
     Provider.family<Map<String, List<Task>>, String>((ref, boardId) {
   final tasks = ref.watch(tasksStreamProvider(boardId)).valueOrNull ?? [];
@@ -64,7 +90,8 @@ final tasksByStatusProvider =
   };
 });
 
-// Estadísticas del tablero
+// ── Estadísticas del tablero ──────────────────────────────
+
 class BoardStats {
   final int total;
   final int completed;
@@ -88,7 +115,6 @@ final boardStatsProvider =
   final completed = tasks.where((t) => t.isCompleted).length;
   final inProgress = tasks.where((t) => t.isInProgress).length;
   final pending = tasks.where((t) => t.isPending).length;
-
   return BoardStats(
     total: total,
     completed: completed,
@@ -98,7 +124,8 @@ final boardStatsProvider =
   );
 });
 
-// Acciones sobre tareas
+// ── Acciones sobre tareas ─────────────────────────────────
+
 final taskActionsProvider =
     Provider.family<TaskActions, String>((ref, boardId) {
   return TaskActions(
@@ -137,16 +164,16 @@ class TaskActions {
       priority: priority,
       userId: _userId,
     );
-    _ref.invalidate(tasksStreamProvider(_boardId));
+    _ref.invalidate(boardsProvider);
   }
 
   Future<void> updateStatus(String taskId, String newStatus) async {
     await _repo.updateTaskStatus(taskId, newStatus);
-    _ref.invalidate(tasksStreamProvider(_boardId));
+    _ref.invalidate(boardsProvider);
   }
 
   Future<void> deleteTask(String taskId) async {
     await _repo.deleteTask(taskId);
-    _ref.invalidate(tasksStreamProvider(_boardId));
+    _ref.invalidate(boardsProvider);
   }
 }

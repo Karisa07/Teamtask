@@ -11,6 +11,7 @@ class Board {
   final DateTime createdAt;
   final int taskCount;
   final int completedCount;
+  final String? inviteCode; // ← nuevo
 
   Board({
     required this.id,
@@ -21,6 +22,7 @@ class Board {
     required this.createdAt,
     this.taskCount = 0,
     this.completedCount = 0,
+    this.inviteCode, // ← nuevo
   });
 
   double get completionPercentage =>
@@ -36,6 +38,7 @@ class Board {
       createdAt: DateTime.parse(json['created_at']),
       taskCount: (json['task_count'] ?? 0) as int,
       completedCount: (json['completed_count'] ?? 0) as int,
+      inviteCode: json['invite_code'], // ← nuevo
     );
   }
 }
@@ -89,42 +92,60 @@ class BoardRepository {
 
   BoardRepository(this._client);
 
-  // Tableros
+  // ── Tableros ─────────────────────────────────────────
 
   Future<List<Board>> getBoards(String userId) async {
-    final boardsResponse = await _client
+    // Tableros propios
+    final ownedResponse = await _client
         .from('boards')
         .select('*')
         .eq('created_by', userId)
         .order('created_at', ascending: false);
 
-    final boards = boardsResponse as List;
-    final result = <Board>[];
+    // Tableros donde es miembro
+    final memberResponse = await _client
+        .from('board_members')
+        .select('board_id, boards(*)')
+        .eq('user_id', userId);
 
-    for (final boardJson in boards) {
+    // IDs de tableros propios para no duplicar
+    final ownedIds = (ownedResponse as List).map((b) => b['id']).toSet();
+
+    // Combinar: propios + miembro (sin duplicados)
+    final allJsons = [
+      ...ownedResponse,
+      ...(memberResponse as List)
+          .map((m) => m['boards'])
+          .where((b) => b != null && !ownedIds.contains(b['id'])),
+    ];
+
+    final boards = <Board>[];
+    for (final json in allJsons) {
       final tasksResponse = await _client
           .from('tasks')
-          .select('status')
-          .eq('board_id', boardJson['id']);
+          .select('id')
+          .eq('board_id', json['id']);
 
-      final tasks = tasksResponse as List;
-      final taskCount = tasks.length;
-      final completedCount =
-          tasks.where((t) => t['status'] == 'completed').length;
+      final completedResponse = await _client
+          .from('tasks')
+          .select('id')
+          .eq('board_id', json['id'])
+          .eq('status', 'completed');
 
-      result.add(Board(
-        id: boardJson['id'],
-        name: boardJson['name'],
-        description: boardJson['description'],
-        emoji: boardJson['emoji'] ?? '📋',
-        createdBy: boardJson['created_by'],
-        createdAt: DateTime.parse(boardJson['created_at']),
-        taskCount: taskCount,
-        completedCount: completedCount,
+      boards.add(Board(
+        id: json['id'],
+        name: json['name'],
+        description: json['description'],
+        emoji: json['emoji'] ?? '📋',
+        createdBy: json['created_by'],
+        createdAt: DateTime.parse(json['created_at']),
+        taskCount: (tasksResponse as List).length,
+        completedCount: (completedResponse as List).length,
+        inviteCode: json['invite_code'],
       ));
     }
 
-    return result;
+    return boards;
   }
 
   Future<Board> createBoard({
@@ -133,6 +154,9 @@ class BoardRepository {
     required String emoji,
     required String userId,
   }) async {
+    // Generar código de invitación aleatorio de 6 caracteres
+    final inviteCode = _generateCode();
+
     final response = await _client
         .from(SupabaseConstants.boardsTable)
         .insert({
@@ -140,6 +164,7 @@ class BoardRepository {
           'description': description,
           'emoji': emoji,
           'created_by': userId,
+          'invite_code': inviteCode,
         })
         .select()
         .single();
@@ -147,7 +172,75 @@ class BoardRepository {
     return Board.fromJson(response);
   }
 
-  // Tareas 
+  // ── Invitaciones ─────────────────────────────────────
+
+  // Unirse a un tablero con código
+  Future<Board> joinBoardByCode({
+    required String code,
+    required String userId,
+  }) async {
+    // Buscar tablero por código
+    final boardResponse = await _client
+        .from('boards')
+        .select('*')
+        .eq('invite_code', code.toUpperCase().trim())
+        .maybeSingle();
+
+    if (boardResponse == null) {
+      throw Exception('Código de invitación inválido');
+    }
+
+    final boardId = boardResponse['id'] as String;
+
+    // Verificar que no sea el dueño
+    if (boardResponse['created_by'] == userId) {
+      throw Exception('Ya eres el dueño de este tablero');
+    }
+
+    // Verificar que no sea ya miembro
+    final existing = await _client
+        .from('board_members')
+        .select('id')
+        .eq('board_id', boardId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (existing != null) {
+      throw Exception('Ya eres miembro de este tablero');
+    }
+
+    // Insertar miembro
+    await _client.from('board_members').insert({
+      'board_id': boardId,
+      'user_id': userId,
+    });
+
+    return Board.fromJson(boardResponse);
+  }
+
+  // Obtener código de invitación de un tablero
+  Future<String?> getInviteCode(String boardId) async {
+    final response = await _client
+        .from('boards')
+        .select('invite_code')
+        .eq('id', boardId)
+        .single();
+    return response['invite_code'] as String?;
+  }
+
+  String _generateCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final rand = DateTime.now().millisecondsSinceEpoch;
+    var code = '';
+    var seed = rand;
+    for (int i = 0; i < 6; i++) {
+      code += chars[seed % chars.length];
+      seed = seed ~/ chars.length + i * 7;
+    }
+    return code;
+  }
+
+  // ── Tareas ───────────────────────────────────────────
 
   Future<List<Task>> getTasks(String boardId) async {
     final response = await _client
@@ -201,7 +294,7 @@ class BoardRepository {
         .eq('id', taskId);
   }
 
-  // Realtime
+  // ── Realtime ─────────────────────────────────────────
 
   Stream<List<Task>> watchTasks(String boardId) {
     return _client
@@ -209,8 +302,9 @@ class BoardRepository {
         .stream(primaryKey: ['id'])
         .eq('board_id', boardId)
         .map((data) => data.map((json) => Task.fromJson(json)).toList())
+        .distinct()
         .handleError((error) {
-          debugPrint('🔴 Realtime error: $error - reconectando...');
+          debugPrint('🔴 Realtime error: $error');
         });
   }
 }

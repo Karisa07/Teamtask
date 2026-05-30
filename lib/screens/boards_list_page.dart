@@ -6,8 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:teamtask/board_provider.dart';
 import 'package:teamtask/board_repository.dart';
 import 'package:teamtask/auth_provider.dart';
+import 'package:teamtask/profile_provider.dart';
 import 'package:teamtask/app_theme.dart';
 import 'package:teamtask/screens/create_board_sheet.dart';
+import 'package:teamtask/screens/join_board_sheet.dart';
+
 
 class BoardsListPage extends ConsumerWidget {
   const BoardsListPage({super.key});
@@ -16,6 +19,7 @@ class BoardsListPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final boardsAsync = ref.watch(boardsProvider);
     final currentUser = ref.watch(currentUserProvider);
+    final profileAsync = ref.watch(profileProvider);
 
     return Scaffold(
       body: CustomScrollView(
@@ -56,38 +60,34 @@ class BoardsListPage extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    PopupMenuButton(
+
+                    GestureDetector(
+                      onTap: () => context.push('/profile'),
                       child: CircleAvatar(
                         radius: 22,
                         backgroundColor: AppTheme.primaryColor,
-                        child: Text(
-                          (currentUser?.userMetadata?['full_name']
-                                      ?.toString()
-                                      .isNotEmpty ==
-                                  true)
-                              ? currentUser!.userMetadata!['full_name']
-                                  .toString()[0]
-                                  .toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        backgroundImage:
+                            profileAsync.valueOrNull?.avatarUrl != null
+                                ? NetworkImage(
+                                    profileAsync.valueOrNull!.avatarUrl!)
+                                : null,
+                        child: profileAsync.valueOrNull?.avatarUrl == null
+                            ? Text(
+                                (currentUser?.userMetadata?['full_name']
+                                            ?.toString()
+                                            .isNotEmpty ==
+                                        true)
+                                    ? currentUser!.userMetadata!['full_name']
+                                        .toString()[0]
+                                        .toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )
+                            : null,
                       ),
-                      itemBuilder: (_) => [
-                        PopupMenuItem(
-                          child: const Row(
-                            children: [
-                              Icon(Icons.logout, size: 18),
-                              Gap(8),
-                              Text('Cerrar sesión'),
-                            ],
-                          ),
-                          onTap: () =>
-                              ref.read(authServiceProvider).signOut(),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -114,7 +114,7 @@ class BoardsListPage extends ConsumerWidget {
                       final board = boards[index];
                       return BoardCard(
                         board: board,
-                        onTap: () => context.go(
+                        onTap: () => context.push(
                           '/boards/${board.id}',
                           extra: board.name,
                         ),
@@ -131,26 +131,46 @@ class BoardsListPage extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (_) => const CreateBoardSheet(),
-        ),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text(
-          'Nuevo tablero',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ).animate().scale(delay: 300.ms),
+      floatingActionButton: Column(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    FloatingActionButton(
+      heroTag: 'join',
+      onPressed: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const JoinBoardSheet(),
+      ),
+      backgroundColor: Colors.white,
+      foregroundColor: AppTheme.primaryColor,
+      elevation: 2,
+      tooltip: 'Unirse con código',
+      child: const Icon(Icons.group_add_outlined),
+    ),
+    const Gap(12),
+    FloatingActionButton.extended(
+      heroTag: 'create',
+      onPressed: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const CreateBoardSheet(),
+      ),
+      backgroundColor: AppTheme.primaryColor,
+      foregroundColor: Colors.white,
+      icon: const Icon(Icons.add),
+      label: const Text(
+        'Nuevo tablero',
+        style: TextStyle(fontWeight: FontWeight.w600),
+      ),
+    ).animate().scale(delay: 300.ms),
+  ],
+),
     );
   }
 }
-
-// BoardCard 
+// ── BoardCard ────────────────────────────────────────────
 class BoardCard extends StatelessWidget {
   final Board board;
   final VoidCallback onTap;
@@ -242,8 +262,7 @@ class BoardCard extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: board.completionPercentage,
                   backgroundColor: Colors.grey.shade200,
-                  valueColor: const AlwaysStoppedAnimation(
-                      AppTheme.successColor),
+                  valueColor: const AlwaysStoppedAnimation(AppTheme.successColor),
                   minHeight: 5,
                 ),
               ),
@@ -255,7 +274,7 @@ class BoardCard extends StatelessWidget {
   }
 }
 
-//Empty state 
+// ── Empty state ──────────────────────────────────────────
 class _EmptyBoards extends StatelessWidget {
   const _EmptyBoards();
 
@@ -294,7 +313,7 @@ class _EmptyBoards extends StatelessWidget {
   }
 }
 
-//  Skeleton 
+// ── Skeleton ─────────────────────────────────────────────
 class _BoardsSkeleton extends StatelessWidget {
   const _BoardsSkeleton();
 

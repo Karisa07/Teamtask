@@ -6,11 +6,10 @@ import 'package:teamtask/screens/login_page.dart';
 import 'package:teamtask/screens/register_page.dart';
 import 'package:teamtask/screens/boards_list_page.dart';
 import 'package:teamtask/screens/board_detail_page.dart';
+import 'package:teamtask/screens/profile_page.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authNotifier = ValueNotifier<bool>(
-    ref.read(authStateProvider).valueOrNull != null,
-  );
+  final authNotifier = _AuthNotifier();
 
   ref.listen(authStateProvider, (_, next) {
     authNotifier.value = next.valueOrNull != null;
@@ -20,7 +19,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/login',
     refreshListenable: authNotifier,
     redirect: (context, state) {
-      final isLoggedIn = authNotifier.value;
+      // Mientras carga el estado de auth, no redirigir
+      final authState = ref.read(authStateProvider);
+      if (authState.isLoading) return null;
+
+      final isLoggedIn = authState.valueOrNull != null;
       final onAuth = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
 
@@ -46,12 +49,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, state) {
           final boardId = state.pathParameters['boardId']!;
           final boardName = state.extra as String? ?? 'Tablero';
-          return BoardDetailPage(
-            boardId: boardId,
-            boardName: boardName,
-          );
+          return BoardDetailPage(boardId: boardId, boardName: boardName);
         },
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (_, __) => const ProfilePage(),
       ),
     ],
   );
 });
+
+// Notifier separado para evitar el problema del valor inicial
+class _AuthNotifier extends ChangeNotifier {
+  bool _value = false;
+
+  bool get value => _value;
+
+  set value(bool newValue) {
+    if (_value != newValue) {
+      _value = newValue;
+      notifyListeners();
+    }
+  }
+}

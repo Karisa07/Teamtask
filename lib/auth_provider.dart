@@ -67,24 +67,24 @@ class AuthService {
     }
   }
 
-  Future<void> signInWithGoogle() async {
-    await _client.auth.signInWithOAuth(
-      
-      OAuthProvider.google,
-      redirectTo: kIsWeb 
-        ? 'http://localhost:3000'           // para web
-        : SupabaseConstants.redirectUrl,    // para móvil
+ Future<void> signInWithGoogle() async {
+  await _client.auth.signInWithOAuth(
+    OAuthProvider.google,
+    redirectTo: SupabaseConstants.redirectUrl,
     authScreenLaunchMode: LaunchMode.externalApplication,
-    );
-  }
-                                            
-  Future<void> signInWithGitHub() async {
-    await _client.auth.signInWithOAuth(
-      OAuthProvider.github,
-      redirectTo: SupabaseConstants.redirectUrl,
-      authScreenLaunchMode: LaunchMode.externalApplication,
-    );
-  }
+    queryParams: {
+      'access_type': 'offline',
+    },
+  );
+}
+
+Future<void> signInWithGitHub() async {
+  await _client.auth.signInWithOAuth(
+    OAuthProvider.github,
+    redirectTo: SupabaseConstants.redirectUrl,
+    authScreenLaunchMode: LaunchMode.externalApplication,
+  );
+}
 
   //      OAuth: Apple                                                 
   Future<void> signInWithApple() async {
