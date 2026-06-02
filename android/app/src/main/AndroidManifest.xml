@@ -22,14 +22,20 @@
             </intent-filter>
 
             <!-- Deep link para OAuth de Supabase -->
+            <!--
+              Importante: este intent-filter intercepta el callback custom scheme.
+              Así evitamos que GoRouter lo trate como ruta (causaba el error de Origin).
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
+
                 <data
                     android:scheme="io.supabase.teamtask"
                     android:host="login-callback"/>
             </intent-filter>
+
 
         </activity>
         <meta-data

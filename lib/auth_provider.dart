@@ -1,31 +1,39 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'constants/supabase_constants.dart';
-import 'package:flutter/foundation.dart'; 
 
-
-// Cliente Supabase global
- 
 final supabaseClientProvider = Provider<SupabaseClient>(
   (_) => Supabase.instance.client,
 );
 
- 
-// Stream del estado de sesión
- 
 final authStateProvider = StreamProvider<User?>((ref) {
   final client = ref.watch(supabaseClientProvider);
-  return client.auth.onAuthStateChange.map((e) => e.session?.user);
+
+  // Emitir un valor inicial (sesión persistida si existe)
+  // y luego seguir con los cambios reales del auth.
+  final initialUser = client.auth.currentUser;
+
+  // Construimos un stream con valor inicial (currentUser) y luego el stream real.
+  return Stream<User?>.multi((controller) {
+    controller.add(initialUser);
+
+    final sub = client.auth
+        .onAuthStateChange
+        .map((e) => e.session?.user)
+        .listen(
+          (user) => controller.add(user),
+          onError: controller.addError,
+        );
+
+    controller.onCancel = () => sub.cancel();
+  });
 });
 
-// Usuario actual (sincrono)
 final currentUserProvider = Provider<User?>((ref) {
   return ref.watch(authStateProvider).valueOrNull;
 });
 
- 
-// Servicio de autenticación
- 
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService(ref.watch(supabaseClientProvider));
 });
@@ -33,8 +41,6 @@ final authServiceProvider = Provider<AuthService>((ref) {
 class AuthService {
   final SupabaseClient _client;
   AuthService(this._client);
-
-                                    
 
   Future<AuthResponse> signInWithEmail({
     required String email,
@@ -62,31 +68,32 @@ class AuthService {
       }
       return res;
     } catch (e) {
-       debugPrint('🔴 ERROR SIGNUP: $e'); 
+      debugPrint('🔴 ERROR SIGNUP: $e');
       rethrow;
     }
   }
 
- Future<void> signInWithGoogle() async {
+  Future<void> signInWithGoogle() async {
   await _client.auth.signInWithOAuth(
     OAuthProvider.google,
     redirectTo: SupabaseConstants.redirectUrl,
     authScreenLaunchMode: LaunchMode.externalApplication,
     queryParams: {
       'access_type': 'offline',
+      'prompt': 'select_account',
     },
   );
 }
+  
 
-Future<void> signInWithGitHub() async {
-  await _client.auth.signInWithOAuth(
-    OAuthProvider.github,
-    redirectTo: SupabaseConstants.redirectUrl,
-    authScreenLaunchMode: LaunchMode.externalApplication,
-  );
-}
+  Future<void> signInWithGitHub() async {
+    await _client.auth.signInWithOAuth(
+      OAuthProvider.github,
+      redirectTo: SupabaseConstants.redirectUrl,
+      authScreenLaunchMode: LaunchMode.externalApplication,
+    );
+  }
 
-  //      OAuth: Apple                                                 
   Future<void> signInWithApple() async {
     await _client.auth.signInWithOAuth(
       OAuthProvider.apple,
@@ -95,10 +102,8 @@ Future<void> signInWithGitHub() async {
     );
   }
 
-  //      Cerrar sesión                                               
   Future<void> signOut() => _client.auth.signOut();
 
-  //      Helpers                                                           
   bool get isAuthenticated => _client.auth.currentUser != null;
   User? get currentUser => _client.auth.currentUser;
 

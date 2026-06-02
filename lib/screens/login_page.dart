@@ -6,6 +6,7 @@ import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:teamtask/auth_provider.dart';
 import 'package:teamtask/app_theme.dart';
+import 'package:teamtask/screens/register_page.dart';
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
@@ -219,7 +220,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               //Link a registro
               Center(
                 child: TextButton(
-                  onPressed: () => context.go('/register'),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterPage())),
                   child: RichText(
                     text: TextSpan(
                       style: TextStyle(color: Colors.grey.shade600),

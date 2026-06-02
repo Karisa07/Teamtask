@@ -3,26 +3,40 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:teamtask/screens/login_page.dart';
 import 'package:teamtask/screens/boards_list_page.dart';
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<AuthState>(
-      stream: Supabase.instance.client.auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+  State<AuthGate> createState() => _AuthGateState();
+}
 
-        final session = snapshot.data?.session;
-        if (session != null) {
-          return const BoardsListPage();
-        }
-        return const LoginPage();
-      },
-    );
+class _AuthGateState extends State<AuthGate> {
+  bool _isLoggedIn = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _isLoggedIn =
+        Supabase.instance.client.auth.currentSession != null;
+    debugPrint('🔴 AuthGate init - sesión: $_isLoggedIn');
+
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      debugPrint(
+          '🔴 AuthState cambió: ${data.event} - sesión: ${data.session?.user.email}');
+      if (mounted) {
+        setState(() {
+          _isLoggedIn = data.session != null;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoggedIn) {
+      return const BoardsListPage();
+    }
+    return const LoginPage();
   }
 }

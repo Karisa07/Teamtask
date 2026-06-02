@@ -11,9 +11,6 @@ void main() async {
   await Supabase.initialize(
     url: SupabaseConstants.supabaseUrl,
     anonKey: SupabaseConstants.supabaseAnonKey,
-    authOptions: const FlutterAuthClientOptions(
-      authFlowType: AuthFlowType.implicit,
-    ),
   );
 
   runApp(const ProviderScope(child: TeamTaskApp()));
@@ -24,13 +21,11 @@ class TeamTaskApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(appRouterProvider);
-
     return MaterialApp.router(
       title: 'TeamTask',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      routerConfig: router,
+      routerConfig: ref.watch(appRouterProvider),
     );
   }
 }

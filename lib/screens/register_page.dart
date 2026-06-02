@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gap/gap.dart';
-import 'package:go_router/go_router.dart';
 import 'package:teamtask/auth_provider.dart';
 import 'package:teamtask/app_theme.dart';
 
@@ -43,12 +42,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   Future<void> _register() async {
-    debugPrint('🔴 _register() llamado');
-    debugPrint('🔴 nombre: "${_nameCtrl.text}"');
-    debugPrint('🔴 email: "${_emailCtrl.text}"');
-    debugPrint('🔴 password length: ${_passCtrl.text.length}');
     final isValid = _formKey.currentState!.validate();
-    debugPrint('🔴 FORMULARIO VALIDO: $isValid');
     if (!isValid) return;
 
     setState(() {
@@ -57,29 +51,26 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     });
 
     try {
-      debugPrint('🔴 Intentando crear cuenta: ${_emailCtrl.text.trim()}');
       await ref.read(authServiceProvider).signUpWithEmail(
             email: _emailCtrl.text.trim(),
             password: _passCtrl.text,
             fullName: _nameCtrl.text.trim(),
           );
-      debugPrint('🔴 Cuenta creada exitosamente');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Cuenta creada!'),
+            content: Text('¡Cuenta creada! Revisa tu correo.'),
             backgroundColor: AppTheme.successColor,
           ),
         );
-        context.go('/login');
+        Navigator.pop(context);
       }
     } catch (e) {
-      debugPrint('🔴 ERROR: $e');
       if (mounted) {
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text('Error detallado'),
+            title: const Text('Error'),
             content: Text(e.toString()),
             actions: [
               TextButton(
@@ -112,12 +103,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('🔴 BUILD - anyLoading: $_anyLoading, email: $_loadingEmail');
     final svc = ref.read(authServiceProvider);
 
     return Scaffold(
       appBar: AppBar(
-        leading: BackButton(onPressed: () => context.go('/login')),
+        leading: BackButton(onPressed: () => Navigator.pop(context)),
         title: const Text('Crear cuenta'),
       ),
       body: SafeArea(
@@ -223,8 +213,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: _register,
-                          child: _loadingEmail
+                        onPressed: _anyLoading ? null : _register,
+                        child: _loadingEmail
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
@@ -240,7 +230,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               const Gap(28),
               Center(
                 child: TextButton(
-                  onPressed: () => context.go('/login'),
+                  onPressed: () => Navigator.pop(context),
                   child: RichText(
                     text: TextSpan(
                       style: TextStyle(color: Colors.grey.shade600),
@@ -284,14 +274,29 @@ class _OAuthRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _OAuthIcon(icon: FontAwesomeIcons.google, color: AppTheme.googleRed,
-            loading: loadingGoogle, disabled: disabled, onTap: onGoogle, tooltip: 'Google'),
+        _OAuthIcon(
+            icon: FontAwesomeIcons.google,
+            color: AppTheme.googleRed,
+            loading: loadingGoogle,
+            disabled: disabled,
+            onTap: onGoogle,
+            tooltip: 'Google'),
         const Gap(12),
-        _OAuthIcon(icon: FontAwesomeIcons.github, color: AppTheme.githubDark,
-            loading: loadingGitHub, disabled: disabled, onTap: onGitHub, tooltip: 'GitHub'),
+        _OAuthIcon(
+            icon: FontAwesomeIcons.github,
+            color: AppTheme.githubDark,
+            loading: loadingGitHub,
+            disabled: disabled,
+            onTap: onGitHub,
+            tooltip: 'GitHub'),
         const Gap(12),
-        _OAuthIcon(icon: FontAwesomeIcons.apple, color: AppTheme.appleBlack,
-            loading: loadingApple, disabled: disabled, onTap: onApple, tooltip: 'Apple'),
+        _OAuthIcon(
+            icon: FontAwesomeIcons.apple,
+            color: AppTheme.appleBlack,
+            loading: loadingApple,
+            disabled: disabled,
+            onTap: onApple,
+            tooltip: 'Apple'),
       ],
     );
   }
@@ -305,8 +310,12 @@ class _OAuthIcon extends StatelessWidget {
   final String tooltip;
 
   const _OAuthIcon({
-    required this.icon, required this.color, required this.loading,
-    required this.disabled, required this.onTap, required this.tooltip,
+    required this.icon,
+    required this.color,
+    required this.loading,
+    required this.disabled,
+    required this.onTap,
+    required this.tooltip,
   });
 
   @override
@@ -323,15 +332,20 @@ class _OAuthIcon extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: disabled ? Colors.grey.shade200 : color.withOpacity(0.3),
+                color:
+                    disabled ? Colors.grey.shade200 : color.withOpacity(0.3),
                 width: 1.5,
               ),
             ),
             child: Center(
               child: loading
-                  ? SizedBox(width: 18, height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: color))
-                  : FaIcon(icon, size: 20,
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: color))
+                  : FaIcon(icon,
+                      size: 20,
                       color: disabled ? Colors.grey.shade300 : color),
             ),
           ),
@@ -378,7 +392,8 @@ class _ErrorBanner extends StatelessWidget {
           const Gap(8),
           Expanded(
             child: Text(message,
-                style: const TextStyle(color: AppTheme.errorColor, fontSize: 13)),
+                style: const TextStyle(
+                    color: AppTheme.errorColor, fontSize: 13)),
           ),
         ],
       ),

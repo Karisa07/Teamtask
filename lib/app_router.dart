@@ -18,14 +18,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/login',
     refreshListenable: authNotifier,
-    redirect: (context, state) {
-      // Mientras carga el estado de auth, no redirigir
+      redirect: (context, state) {
+      // Si llega el callback OAuth con scheme custom, no hagas nada con rutas.
+      // Deja que Supabase procese el URI y que el provider de auth gobierne la navegación.
+      final loc = state.matchedLocation;
+      if (loc.contains('login-callback') || loc.startsWith('io.supabase.teamtask://')) {
+        return '/login';
+      }
+
       final authState = ref.read(authStateProvider);
+
       if (authState.isLoading) return null;
 
       final isLoggedIn = authState.valueOrNull != null;
-      final onAuth = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/register';
+      final onAuth = loc == '/login' || loc == '/register';
 
       if (!isLoggedIn && !onAuth) return '/login';
       if (isLoggedIn && onAuth) return '/boards';
@@ -60,7 +66,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-// Notifier separado para evitar el problema del valor inicial
+
 class _AuthNotifier extends ChangeNotifier {
   bool _value = false;
 
