@@ -7,6 +7,8 @@ import 'package:teamtask/screens/register_page.dart';
 import 'package:teamtask/screens/boards_list_page.dart';
 import 'package:teamtask/screens/board_detail_page.dart';
 import 'package:teamtask/screens/profile_page.dart';
+import 'package:teamtask/screens/statistics_page.dart';
+
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authNotifier = _AuthNotifier();
@@ -58,6 +60,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return BoardDetailPage(boardId: boardId, boardName: boardName);
         },
       ),
+      GoRoute(
+        path: '/boards/:boardId/stats',
+        builder: (_, state) {
+          final boardId = state.pathParameters['boardId']!;
+          final boardName = state.extra as String? ?? 'Tablero';
+          return StatisticsPage(boardId: boardId, boardName: boardName);
+        },
+      ),
+
       GoRoute(
         path: '/profile',
         builder: (_, __) => const ProfilePage(),

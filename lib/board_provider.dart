@@ -90,38 +90,12 @@ final tasksByStatusProvider =
   };
 });
 
-// ── Estadísticas del tablero ──────────────────────────────
+// ── Estadísticas del tablero ─────
 
-class BoardStats {
-  final int total;
-  final int completed;
-  final int inProgress;
-  final int pending;
-  final double percentage;
-
-  BoardStats({
-    required this.total,
-    required this.completed,
-    required this.inProgress,
-    required this.pending,
-    required this.percentage,
-  });
-}
-
-final boardStatsProvider =
-    Provider.family<BoardStats, String>((ref, boardId) {
-  final tasks = ref.watch(tasksStreamProvider(boardId)).valueOrNull ?? [];
-  final total = tasks.length;
-  final completed = tasks.where((t) => t.isCompleted).length;
-  final inProgress = tasks.where((t) => t.isInProgress).length;
-  final pending = tasks.where((t) => t.isPending).length;
-  return BoardStats(
-    total: total,
-    completed: completed,
-    inProgress: inProgress,
-    pending: pending,
-    percentage: total == 0 ? 0.0 : completed / total,
-  );
+final statsProvider = FutureProvider.family<BoardStats, String>((ref, boardId) async {
+  ref.watch(tasksStreamProvider(boardId));
+  final repo = ref.watch(boardRepositoryProvider);
+  return repo.getBoardStats(boardId);
 });
 
 // ── Acciones sobre tareas ─────────────────────────────────

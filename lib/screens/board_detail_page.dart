@@ -118,8 +118,12 @@ class BoardDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tasksAsync = ref.watch(tasksStreamProvider(boardId));
-    final stats = ref.watch(boardStatsProvider(boardId));
+    final statsAsync = ref.watch(statsProvider(boardId));
+
     final tasksByStatus = ref.watch(tasksByStatusProvider(boardId));
+
+    final stats = statsAsync.valueOrNull ?? const BoardStats(total: 0, pending: 0, inProgress: 0, completed: 0, percentage: 0);
+
     final profileAsync = ref.watch(profileProvider);
     final currentUser = ref.watch(currentUserProvider);
 
@@ -141,7 +145,13 @@ class BoardDetailPage extends ConsumerWidget {
         leading: BackButton(onPressed: () => context.pop()),
         title: Text(boardName),
         actions: [
+          IconButton(
+            tooltip: 'Ver estadísticas',
+            onPressed: () => context.push('/boards/$boardId/stats', extra: boardName),
+            icon: const Icon(Icons.bar_chart_rounded),
+          ),
           // Botón de invitación (solo para el dueño)
+
           if (isOwner)
             IconButton(
               onPressed: () => _showInviteCode(context, ref),

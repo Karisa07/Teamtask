@@ -24,6 +24,8 @@ dependencies:
   gap: ^3.0.1
   font_awesome_flutter: ^10.7.0   # Íconos de GitHub, Apple, Google
   image_picker: ^1.0.7
+  fl_chart: ^0.69.0
+
 
 
 dev_dependencies:

@@ -102,3 +102,32 @@ create policy "Eliminar tareas"
 -- Habilitar Realtime
 alter publication supabase_realtime add table public.tasks;
 alter publication supabase_realtime add table public.boards;
+
+-- ─────────────────────────────────────────────────────────────
+-- TT-12-2: RPC de estadísticas por tablero (agregación)
+-- Retorna counts por estado y porcentaje completadas
+-- ─────────────────────────────────────────────────────────────
+
+create or replace function public.get_board_stats(board_uuid uuid)
+returns table (
+  total integer,
+  pending integer,
+  in_progress integer,
+  completed integer,
+  percentage double precision
+)
+language sql
+security definer
+as $$
+  select
+    count(*)::int as total,
+    count(*) filter (where status = 'pending')::int as pending,
+    count(*) filter (where status = 'in_progress')::int as in_progress,
+    count(*) filter (where status = 'completed')::int as completed,
+    case
+      when count(*) = 0 then 0.0
+      else (count(*) filter (where status = 'completed')::double precision / count(*)::double precision)
+    end as percentage
+  from public.tasks
+  where board_id = board_uuid;
+$$;

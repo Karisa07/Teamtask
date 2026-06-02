@@ -87,10 +87,39 @@ class Task {
   }
 }
 
+class BoardStats {
+  final int total;
+  final int pending;
+  final int inProgress;
+  final int completed;
+  final double percentage;
+
+  const BoardStats({
+    required this.total,
+    required this.pending,
+    required this.inProgress,
+    required this.completed,
+    required this.percentage,
+  });
+
+  factory BoardStats.fromJson(Map<String, dynamic> json) {
+    return BoardStats(
+      total: (json['total'] ?? 0) as int,
+      pending: (json['pending'] ?? 0) as int,
+      inProgress: (json['in_progress'] ?? json['inProgress'] ?? 0) as int,
+      completed: (json['completed'] ?? 0) as int,
+      percentage: (json['percentage'] ?? 0.0) is double
+          ? (json['percentage'] as double)
+          : ((json['percentage'] ?? 0.0) as num).toDouble(),
+    );
+  }
+}
+
 class BoardRepository {
   final SupabaseClient _client;
 
   BoardRepository(this._client);
+
 
   // ── Tableros ─────────────────────────────────────────
 
@@ -146,6 +175,18 @@ class BoardRepository {
     }
 
     return boards;
+  }
+
+  Future<BoardStats> getBoardStats(String boardId) async {
+    final res = await _client
+        .rpc('get_board_stats', params: {'board_uuid': boardId});
+
+    // Supabase rpc returns a List of rows for table returns
+    final row = (res as List).isNotEmpty
+        ? (res as List).first as Map<String, dynamic>
+        : <String, dynamic>{};
+
+    return BoardStats.fromJson(row);
   }
 
   Future<Board> createBoard({
