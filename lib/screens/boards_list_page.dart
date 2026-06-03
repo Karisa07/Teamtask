@@ -10,6 +10,7 @@ import 'package:teamtask/profile_provider.dart';
 import 'package:teamtask/app_theme.dart';
 import 'package:teamtask/screens/create_board_sheet.dart';
 import 'package:teamtask/screens/join_board_sheet.dart';
+import 'package:teamtask/screens/home_notifications_section.dart';
 
 
 class BoardsListPage extends ConsumerWidget {
@@ -24,6 +25,7 @@ class BoardsListPage extends ConsumerWidget {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
+          // ── App Bar ──────────────────────────────────────────
           SliverAppBar(
             expandedHeight: 120,
             floating: false,
@@ -60,7 +62,6 @@ class BoardsListPage extends ConsumerWidget {
                         ),
                       ],
                     ),
-
                     GestureDetector(
                       onTap: () => context.push('/profile'),
                       child: CircleAvatar(
@@ -95,6 +96,15 @@ class BoardsListPage extends ConsumerWidget {
             ),
           ),
 
+          // ── Sección de notificaciones en tiempo real ─────────
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: HomeNotificationsSection(),
+            ),
+          ),
+
+          // ── Lista de tableros ────────────────────────────────
           SliverPadding(
             padding: const EdgeInsets.all(20),
             sliver: boardsAsync.when(
@@ -132,44 +142,45 @@ class BoardsListPage extends ConsumerWidget {
         ],
       ),
       floatingActionButton: Column(
-  mainAxisSize: MainAxisSize.min,
-  children: [
-    FloatingActionButton(
-      heroTag: 'join',
-      onPressed: () => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => const JoinBoardSheet(),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: 'join',
+            onPressed: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => const JoinBoardSheet(),
+            ),
+            backgroundColor: Colors.white,
+            foregroundColor: AppTheme.primaryColor,
+            elevation: 2,
+            tooltip: 'Unirse con código',
+            child: const Icon(Icons.group_add_outlined),
+          ),
+          const Gap(12),
+          FloatingActionButton.extended(
+            heroTag: 'create',
+            onPressed: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => const CreateBoardSheet(),
+            ),
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.add),
+            label: const Text(
+              'Nuevo tablero',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ).animate().scale(delay: 300.ms),
+        ],
       ),
-      backgroundColor: Colors.white,
-      foregroundColor: AppTheme.primaryColor,
-      elevation: 2,
-      tooltip: 'Unirse con código',
-      child: const Icon(Icons.group_add_outlined),
-    ),
-    const Gap(12),
-    FloatingActionButton.extended(
-      heroTag: 'create',
-      onPressed: () => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => const CreateBoardSheet(),
-      ),
-      backgroundColor: AppTheme.primaryColor,
-      foregroundColor: Colors.white,
-      icon: const Icon(Icons.add),
-      label: const Text(
-        'Nuevo tablero',
-        style: TextStyle(fontWeight: FontWeight.w600),
-      ),
-    ).animate().scale(delay: 300.ms),
-  ],
-),
     );
   }
 }
+
 // ── BoardCard ────────────────────────────────────────────
 class BoardCard extends StatelessWidget {
   final Board board;
@@ -262,7 +273,8 @@ class BoardCard extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: board.completionPercentage,
                   backgroundColor: Colors.grey.shade200,
-                  valueColor: const AlwaysStoppedAnimation(AppTheme.successColor),
+                  valueColor:
+                      const AlwaysStoppedAnimation(AppTheme.successColor),
                   minHeight: 5,
                 ),
               ),

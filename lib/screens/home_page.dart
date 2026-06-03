@@ -4,8 +4,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
 import 'package:teamtask/auth_provider.dart';
 import 'package:teamtask/app_theme.dart';
+import 'home_notifications_section.dart';
 
 class HomePlaceholderPage extends ConsumerWidget {
+
   const HomePlaceholderPage({super.key});
 
   @override
@@ -130,7 +132,13 @@ class HomePlaceholderPage extends ConsumerWidget {
 
                 const Gap(32),
 
+                // Apartado de notificaciones
+                const HomeNotificationsSection(),
+
+                const Gap(32),
+
                 OutlinedButton.icon(
+
                   onPressed: () =>
                       ref.read(authServiceProvider).signOut(),
                   icon: const Icon(Icons.logout, size: 18),

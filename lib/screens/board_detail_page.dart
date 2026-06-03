@@ -14,11 +14,13 @@ import 'package:teamtask/screens/create_task_sheet.dart';
 class BoardDetailPage extends ConsumerWidget {
   final String boardId;
   final String boardName;
+  final String? focusTaskId;
 
   const BoardDetailPage({
     super.key,
     required this.boardId,
     required this.boardName,
+    this.focusTaskId,
   });
 
   void _showInviteCode(BuildContext context, WidgetRef ref) async {
@@ -34,21 +36,27 @@ class BoardDetailPage extends ConsumerWidget {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(24),
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const Gap(20),
-            const Icon(Icons.group_add_outlined,
-                size: 40, color: AppTheme.primaryColor),
+            const Icon(
+              Icons.group_add_outlined,
+              size: 40,
+              color: AppTheme.primaryColor,
+            ),
             const Gap(12),
             const Text(
               'Código de invitación',
@@ -62,7 +70,6 @@ class BoardDetailPage extends ConsumerWidget {
             ),
             const Gap(24),
 
-            // Código grande
             GestureDetector(
               onTap: () {
                 Clipboard.setData(ClipboardData(text: code ?? ''));
@@ -74,8 +81,7 @@ class BoardDetailPage extends ConsumerWidget {
                 );
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 32, vertical: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(16),
@@ -97,8 +103,11 @@ class BoardDetailPage extends ConsumerWidget {
                       ),
                     ),
                     const Gap(12),
-                    const Icon(Icons.copy,
-                        color: AppTheme.primaryColor, size: 20),
+                    const Icon(
+                      Icons.copy,
+                      color: AppTheme.primaryColor,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -119,22 +128,30 @@ class BoardDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tasksAsync = ref.watch(tasksStreamProvider(boardId));
     final statsAsync = ref.watch(statsProvider(boardId));
-
     final tasksByStatus = ref.watch(tasksByStatusProvider(boardId));
 
-    final stats = statsAsync.valueOrNull ?? const BoardStats(total: 0, pending: 0, inProgress: 0, completed: 0, percentage: 0);
+    final stats = statsAsync.valueOrNull ??
+        const BoardStats(
+          total: 0,
+          pending: 0,
+          inProgress: 0,
+          completed: 0,
+          percentage: 0,
+        );
 
     final profileAsync = ref.watch(profileProvider);
     final currentUser = ref.watch(currentUserProvider);
 
-    // Verificar si el usuario actual es el dueño
     final boardsAsync = ref.watch(boardsProvider);
     final isOwner = boardsAsync.valueOrNull
             ?.firstWhere(
               (b) => b.id == boardId,
               orElse: () => Board(
-                id: '', name: '', emoji: '',
-                createdBy: '', createdAt: DateTime.now(),
+                id: '',
+                name: '',
+                emoji: '',
+                createdBy: '',
+                createdAt: DateTime.now(),
               ),
             )
             .createdBy ==
@@ -150,16 +167,12 @@ class BoardDetailPage extends ConsumerWidget {
             onPressed: () => context.push('/boards/$boardId/stats', extra: boardName),
             icon: const Icon(Icons.bar_chart_rounded),
           ),
-          // Botón de invitación (solo para el dueño)
-
           if (isOwner)
             IconButton(
               onPressed: () => _showInviteCode(context, ref),
               icon: const Icon(Icons.group_add_outlined),
               tooltip: 'Código de invitación',
             ),
-
-          // Avatar
           GestureDetector(
             onTap: () => context.push('/profile'),
             child: CircleAvatar(
@@ -195,9 +208,7 @@ class BoardDetailPage extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
-              border: Border(
-                bottom: BorderSide(color: Colors.grey.shade200),
-              ),
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,8 +239,7 @@ class BoardDetailPage extends ConsumerWidget {
                   child: LinearProgressIndicator(
                     value: stats.percentage,
                     backgroundColor: Colors.grey.shade200,
-                    valueColor: const AlwaysStoppedAnimation(
-                        AppTheme.primaryColor),
+                    valueColor: const AlwaysStoppedAnimation(AppTheme.primaryColor),
                     minHeight: 6,
                   ),
                 ),
@@ -255,11 +265,9 @@ class BoardDetailPage extends ConsumerWidget {
               ],
             ),
           ),
-
           Expanded(
             child: tasksAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (_) => ListView(
                 scrollDirection: Axis.horizontal,
@@ -271,6 +279,7 @@ class BoardDetailPage extends ConsumerWidget {
                     label: 'Por hacer',
                     emoji: '⏳',
                     color: Colors.grey.shade600,
+                    focusTaskId: focusTaskId,
                     tasks: tasksByStatus['pending'] ?? [],
                   ),
                   const Gap(12),
@@ -281,6 +290,7 @@ class BoardDetailPage extends ConsumerWidget {
                     emoji: '🔄',
                     color: AppTheme.warningColor,
                     tasks: tasksByStatus['in_progress'] ?? [],
+                    focusTaskId: focusTaskId,
                   ),
                   const Gap(12),
                   _KanbanColumn(
@@ -290,6 +300,7 @@ class BoardDetailPage extends ConsumerWidget {
                     emoji: '✅',
                     color: AppTheme.successColor,
                     tasks: tasksByStatus['completed'] ?? [],
+                    focusTaskId: focusTaskId,
                   ),
                 ],
               ),
@@ -311,14 +322,13 @@ class BoardDetailPage extends ConsumerWidget {
   }
 }
 
-// ── Clases sin cambios ────────────────────────────────────
-
 class _KanbanColumn extends ConsumerWidget {
   final String boardId;
   final String status;
   final String label;
   final String emoji;
   final Color color;
+  final String? focusTaskId;
   final List<Task> tasks;
 
   const _KanbanColumn({
@@ -328,6 +338,7 @@ class _KanbanColumn extends ConsumerWidget {
     required this.emoji,
     required this.color,
     required this.tasks,
+    required this.focusTaskId,
   });
 
   @override
@@ -338,8 +349,7 @@ class _KanbanColumn extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
@@ -358,8 +368,7 @@ class _KanbanColumn extends ConsumerWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: color.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
@@ -393,7 +402,11 @@ class _KanbanColumn extends ConsumerWidget {
                     separatorBuilder: (_, __) => const Gap(8),
                     itemBuilder: (context, index) {
                       final task = tasks[index];
-                      return _TaskCard(task: task, boardId: boardId)
+                      return _TaskCard(
+                        task: task,
+                        boardId: boardId,
+                        focusTaskId: focusTaskId,
+                      )
                           .animate(key: ValueKey(task.id))
                           .fadeIn(duration: 300.ms)
                           .slideX(begin: 0.1, end: 0);
@@ -409,8 +422,13 @@ class _KanbanColumn extends ConsumerWidget {
 class _TaskCard extends ConsumerWidget {
   final Task task;
   final String boardId;
+  final String? focusTaskId;
 
-  const _TaskCard({required this.task, required this.boardId});
+  const _TaskCard({
+    required this.task,
+    required this.boardId,
+    required this.focusTaskId,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -420,6 +438,8 @@ class _TaskCard extends ConsumerWidget {
         : task.priority == 'medium'
             ? AppTheme.warningColor
             : AppTheme.successColor;
+
+    final isFocused = focusTaskId != null && focusTaskId == task.id;
 
     return Dismissible(
       key: Key(task.id),
@@ -431,8 +451,7 @@ class _TaskCard extends ConsumerWidget {
           color: AppTheme.errorColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(14),
         ),
-        child:
-            const Icon(Icons.delete_outline, color: AppTheme.errorColor),
+        child: const Icon(Icons.delete_outline, color: AppTheme.errorColor),
       ),
       confirmDismiss: (_) async {
         return await showDialog<bool>(
@@ -447,8 +466,10 @@ class _TaskCard extends ConsumerWidget {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Eliminar',
-                    style: TextStyle(color: AppTheme.errorColor)),
+                child: const Text(
+                  'Eliminar',
+                  style: TextStyle(color: AppTheme.errorColor),
+                ),
               ),
             ],
           ),
@@ -457,6 +478,12 @@ class _TaskCard extends ConsumerWidget {
       onDismissed: (_) => actions.deleteTask(task.id),
       child: Card(
         margin: EdgeInsets.zero,
+        shape: isFocused
+            ? RoundedRectangleBorder(
+                side: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                borderRadius: BorderRadius.circular(16),
+              )
+            : RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () => _showStatusOptions(context, actions),
@@ -468,8 +495,7 @@ class _TaskCard extends ConsumerWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: priorityColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(6),
@@ -522,8 +548,7 @@ class _TaskCard extends ConsumerWidget {
                     decoration: task.isCompleted
                         ? TextDecoration.lineThrough
                         : null,
-                    color:
-                        task.isCompleted ? Colors.grey.shade400 : null,
+                    color: task.isCompleted ? Colors.grey.shade400 : null,
                   ),
                 ),
                 if (task.description != null) ...[
@@ -554,23 +579,24 @@ class _TaskCard extends ConsumerWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const Gap(20),
-            Text(task.title,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(
+              task.title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
             const Gap(20),
             _StatusOption(
               emoji: '⏳',
@@ -601,14 +627,11 @@ class _TaskCard extends ConsumerWidget {
             ),
             const Gap(8),
             ListTile(
-              leading: const Icon(Icons.delete_outline,
-                  color: AppTheme.errorColor),
-              title: const Text('Eliminar',
-                  style: TextStyle(color: AppTheme.errorColor)),
+              leading: const Icon(Icons.delete_outline, color: AppTheme.errorColor),
+              title: const Text('Eliminar', style: TextStyle(color: AppTheme.errorColor)),
               onTap: () {
                 Navigator.pop(ctx);
-                Future.delayed(const Duration(milliseconds: 300),
-                    () async {
+                Future.delayed(const Duration(milliseconds: 300), () async {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (d) => AlertDialog(
@@ -621,9 +644,10 @@ class _TaskCard extends ConsumerWidget {
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(d, true),
-                          child: const Text('Eliminar',
-                              style:
-                                  TextStyle(color: AppTheme.errorColor)),
+                          child: const Text(
+                            'Eliminar',
+                            style: TextStyle(color: AppTheme.errorColor),
+                          ),
                         ),
                       ],
                     ),
@@ -656,16 +680,15 @@ class _StatusOption extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Text(emoji, style: const TextStyle(fontSize: 20)),
-      title: Text(label,
-          style: TextStyle(
-              fontWeight:
-                  isSelected ? FontWeight.w700 : FontWeight.w500)),
-      trailing: isSelected
-          ? const Icon(Icons.check, color: AppTheme.primaryColor)
-          : null,
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        ),
+      ),
+      trailing: isSelected ? const Icon(Icons.check, color: AppTheme.primaryColor) : null,
       onTap: onTap,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 }
@@ -735,8 +758,7 @@ class _RealtimeIndicatorState extends State<_RealtimeIndicator>
             height: 8,
             decoration: BoxDecoration(
               color: widget.isConnected
-                  ? AppTheme.successColor
-                      .withOpacity(0.5 + _controller.value * 0.5)
+                  ? AppTheme.successColor.withOpacity(0.5 + _controller.value * 0.5)
                   : Colors.grey,
               shape: BoxShape.circle,
             ),
@@ -748,12 +770,11 @@ class _RealtimeIndicatorState extends State<_RealtimeIndicator>
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: widget.isConnected
-                ? AppTheme.successColor
-                : Colors.grey.shade400,
+            color: widget.isConnected ? AppTheme.successColor : Colors.grey.shade400,
           ),
         ),
       ],
     );
   }
 }
+

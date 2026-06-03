@@ -78,11 +78,31 @@ final tasksStreamProvider =
   return repo.watchTasks(boardId);
 });
 
+// ── Lista de tareas con override local para deletes optimistas ────────────────
+//
+// Este provider mantiene un Set de IDs eliminados localmente.
+// Cuando el usuario elimina una tarea, el ID se agrega aquí inmediatamente,
+// lo que hace que desaparezca de la UI sin esperar al stream de Supabase.
+// Cuando el stream re-emite sin esa tarea (porque el DELETE ya se aplicó),
+// el Set se limpia solo porque esa ID ya no existe en los datos.
+
+final _deletedTaskIdsProvider =
+    StateProvider.autoDispose.family<Set<String>, String>(
+  (ref, boardId) => {},
+);
+
+final tasksFilteredProvider =
+    Provider.autoDispose.family<List<Task>, String>((ref, boardId) {
+  final tasks = ref.watch(tasksStreamProvider(boardId)).valueOrNull ?? [];
+  final deletedIds = ref.watch(_deletedTaskIdsProvider(boardId));
+  return tasks.where((t) => !deletedIds.contains(t.id)).toList();
+});
+
 // ── Tareas agrupadas por estado ───────────────────────────
 
 final tasksByStatusProvider =
     Provider.family<Map<String, List<Task>>, String>((ref, boardId) {
-  final tasks = ref.watch(tasksStreamProvider(boardId)).valueOrNull ?? [];
+  final tasks = ref.watch(tasksFilteredProvider(boardId));
   return {
     'pending': tasks.where((t) => t.isPending).toList(),
     'in_progress': tasks.where((t) => t.isInProgress).toList(),
@@ -92,7 +112,8 @@ final tasksByStatusProvider =
 
 // ── Estadísticas del tablero ─────
 
-final statsProvider = FutureProvider.family<BoardStats, String>((ref, boardId) async {
+final statsProvider =
+    FutureProvider.family<BoardStats, String>((ref, boardId) async {
   ref.watch(tasksStreamProvider(boardId));
   final repo = ref.watch(boardRepositoryProvider);
   return repo.getBoardStats(boardId);
@@ -146,8 +167,24 @@ class TaskActions {
     _ref.invalidate(boardsProvider);
   }
 
+  /// Elimina una tarea con optimistic update:
+  /// la quita de la UI inmediatamente y luego hace el DELETE en Supabase.
   Future<void> deleteTask(String taskId) async {
-    await _repo.deleteTask(taskId);
-    _ref.invalidate(boardsProvider);
+    // 1. Quitar de la UI de inmediato (optimistic)
+    _ref.read(_deletedTaskIdsProvider(_boardId).notifier).update(
+          (ids) => {...ids, taskId},
+        );
+
+    try {
+      // 2. Borrar en la BD
+      await _repo.deleteTask(taskId);
+      _ref.invalidate(boardsProvider);
+    } catch (e) {
+      // 3. Si falla, revertir el optimistic update
+      _ref.read(_deletedTaskIdsProvider(_boardId).notifier).update(
+            (ids) => ids.where((id) => id != taskId).toSet(),
+          );
+      rethrow;
+    }
   }
 }

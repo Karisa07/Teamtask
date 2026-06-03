@@ -56,8 +56,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/boards/:boardId',
         builder: (_, state) {
           final boardId = state.pathParameters['boardId']!;
-          final boardName = state.extra as String? ?? 'Tablero';
-          return BoardDetailPage(boardId: boardId, boardName: boardName);
+
+          // Extra puede venir como String (boardName) o como Map (focusTaskId)
+          String boardName = 'Tablero';
+          String? focusTaskId;
+
+          final extra = state.extra;
+          if (extra is String) {
+            boardName = extra;
+          } else if (extra is Map) {
+            boardName = (extra['boardName'] as String?) ?? 'Tablero';
+            focusTaskId = extra['focusTaskId'] as String?;
+          }
+
+          return BoardDetailPage(
+            boardId: boardId,
+            boardName: boardName,
+            focusTaskId: focusTaskId,
+          );
         },
       ),
       GoRoute(
