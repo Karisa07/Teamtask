@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:teamtask/app_theme.dart';
 
 import '../auth_provider.dart';
@@ -20,13 +21,11 @@ class HomeNotificationsSection extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final eventsAsync = ref.watch(notificationEventsRecentProvider(20));
-
+    final eventsAsync = ref.watch(notificationEventsNotifierProvider);
 
     return eventsAsync.when(
       loading: () => _shell(
         context,
-        'Notificaciones recientes',
         child: const Center(
           child: Padding(
             padding: EdgeInsets.all(12),
@@ -36,7 +35,6 @@ class HomeNotificationsSection extends ConsumerWidget {
       ),
       error: (e, _) => _shell(
         context,
-        'Notificaciones recientes',
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           child: Text('Error cargando notificaciones: $e'),
@@ -46,7 +44,6 @@ class HomeNotificationsSection extends ConsumerWidget {
         if (events.isEmpty) {
           return _shell(
             context,
-            'Notificaciones recientes',
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
@@ -55,7 +52,7 @@ class HomeNotificationsSection extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Aún no hay eventos.',
+                'No tienes notificaciones nuevas.',
                 style: TextStyle(
                   fontSize: 13,
                   color: Colors.grey.shade700,
@@ -68,15 +65,11 @@ class HomeNotificationsSection extends ConsumerWidget {
 
         return _shell(
           context,
-          'Notificaciones recientes',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final e in events.take(8))
-                _EventRow(
-                  title: (e['title'] ?? '').toString(),
-                  body: (e['body'] ?? '').toString(),
-                ),
+                _EventRow(notification: e),
             ],
           ),
         );
@@ -84,7 +77,7 @@ class HomeNotificationsSection extends ConsumerWidget {
     );
   }
 
-  Widget _shell(BuildContext context, String header, {required Widget child}) {
+  Widget _shell(BuildContext context, {required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -122,50 +115,80 @@ class HomeNotificationsSection extends ConsumerWidget {
   }
 }
 
-class _EventRow extends StatelessWidget {
-  final String title;
-  final String body;
+class _EventRow extends ConsumerWidget {
+  final Map<String, dynamic> notification;
 
-  const _EventRow({required this.title, required this.body});
+  const _EventRow({required this.notification});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final title = (notification['title'] ?? '').toString();
+    final body = (notification['body'] ?? '').toString();
+    final boardId = notification['board_id'] as String?;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppTheme.primaryColor.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title.isNotEmpty ? title : 'Acción',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        await ref
+            .read(notificationEventsNotifierProvider.notifier)
+            .markAsRead(notification['id'] as String);
+
+        if (context.mounted && boardId != null) {
+          context.push(
+            '/boards/$boardId',
+            extra: 'Tablero',
+          );
+        }
+      },
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryColor.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title.isNotEmpty ? title : 'Acción',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      body.isNotEmpty ? body : '—',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              body.isNotEmpty ? body : '—',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade700,
-                height: 1.3,
-              ),
-            ),
-          ],
+              // Ícono indicando que se puede navegar
+              if (boardId != null)
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: Colors.grey.shade400,
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-

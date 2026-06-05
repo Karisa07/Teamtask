@@ -79,7 +79,8 @@ class NotificationService {
         // Navegación a board detail y enfoque de task.
         router.go(
           '/boards/${payload.boardId}',
-          extra: <String, String>{
+          extra: {
+            'boardName': 'Tablero',
             'focusTaskId': payload.taskId,
           },
         );

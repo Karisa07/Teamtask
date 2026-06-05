@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -10,26 +12,55 @@ final notificationEventsRepositoryProvider =
   return NotificationEventRepository(client: client);
 });
 
-/// StreamProvider: escucha la tabla en tiempo real via Supabase Realtime.
-/// Se actualiza automáticamente cada vez que llega un evento nuevo.
-final notificationEventsRecentProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, int>((ref, limit) {
-  final user = ref.watch(currentUserProvider);
-  final userId = user?.id ?? '';
+class NotificationEventsNotifier
+    extends AutoDisposeAsyncNotifier<List<Map<String, dynamic>>> {
+  @override
+  Future<List<Map<String, dynamic>>> build() async {
+    final user = ref.watch(currentUserProvider);
+    final userId = user?.id ?? '';
+    if (userId.isEmpty) return [];
 
-  if (userId.isEmpty) {
-    return Stream.value(<Map<String, dynamic>>[]);
+    final client = ref.watch(supabaseClientProvider);
+
+    // Escucha el stream en tiempo real y actualiza el estado
+    final sub = client
+        .from('notification_events')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
+        .order('created_at', ascending: false)
+        .limit(20)
+        .listen((rows) {
+          // Solo no leídas — pero respeta eliminaciones locales optimistas
+          final unread = rows
+              .where((n) => n['is_read'] == false)
+              .toList();
+          state = AsyncData(unread);
+        });
+
+    // Cancela el stream cuando el provider se destruye
+    ref.onDispose(sub.cancel);
+
+    return [];
   }
 
-  final client = ref.watch(supabaseClientProvider);
+  Future<void> markAsRead(String notificationId) async {
+    // 1. Elimina localmente al instante (optimista)
+    state = AsyncData(
+      state.value
+              ?.where((n) => n['id'] != notificationId)
+              .toList() ??
+          [],
+    );
 
-  // .stream() de Supabase emite cada vez que hay INSERT/UPDATE/DELETE
-  // en la tabla para este usuario, manteniendo la UI en tiempo real.
-  return client
-      .from('notification_events')
-      .stream(primaryKey: ['id'])
-      .eq('user_id', userId)
-      .order('created_at', ascending: false)
-      .limit(limit)
-      .map((rows) => List<Map<String, dynamic>>.from(rows));
-});
+    // 2. Persiste en Supabase — el stream confirmará en el próximo emit
+    await ref
+        .read(notificationEventsRepositoryProvider)
+        .markAsRead(notificationId);
+  }
+}
+
+final notificationEventsNotifierProvider =
+    AsyncNotifierProvider.autoDispose<NotificationEventsNotifier,
+        List<Map<String, dynamic>>>(
+      NotificationEventsNotifier.new,
+    );

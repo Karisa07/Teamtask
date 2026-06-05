@@ -78,14 +78,6 @@ final tasksStreamProvider =
   return repo.watchTasks(boardId);
 });
 
-// ── Lista de tareas con override local para deletes optimistas ────────────────
-//
-// Este provider mantiene un Set de IDs eliminados localmente.
-// Cuando el usuario elimina una tarea, el ID se agrega aquí inmediatamente,
-// lo que hace que desaparezca de la UI sin esperar al stream de Supabase.
-// Cuando el stream re-emite sin esa tarea (porque el DELETE ya se aplicó),
-// el Set se limpia solo porque esa ID ya no existe en los datos.
-
 final _deletedTaskIdsProvider =
     StateProvider.autoDispose.family<Set<String>, String>(
   (ref, boardId) => {},
@@ -147,40 +139,78 @@ class TaskActions {
         _boardId = boardId,
         _ref = ref;
 
+  Future<String> _getActorName() async {
+    try {
+      return await _repo.fetchActorName(_userId);
+    } catch (_) {
+      return 'Usuario';
+    }
+  }
+
   Future<void> createTask({
-    required String title,
-    String? description,
-    String priority = 'medium',
-  }) async {
-    await _repo.createTask(
-      boardId: _boardId,
-      title: title,
-      description: description,
-      priority: priority,
-      userId: _userId,
-    );
-    _ref.invalidate(boardsProvider);
-  }
+  required String title,
+  String? description,
+  String priority = 'medium',
+}) async {
+  final task = await _repo.createTask(
+    boardId: _boardId, title: title,
+    description: description, priority: priority, userId: _userId,
+  );
+  final actorName = await _getActorName();
+  await _repo.logActivity(
+    boardId: _boardId, taskId: task.id,
+    taskTitle: title,                    
+    eventType: 'task_created',
+    actorUserId: _userId, actorName: actorName,
+  );
+  _ref.invalidate(boardsProvider);
+}
 
-  Future<void> updateStatus(String taskId, String newStatus) async {
-    await _repo.updateTaskStatus(taskId, newStatus);
-    _ref.invalidate(boardsProvider);
+Future<void> assignTaskToUser(String taskId, String? assignedUserId, {String? taskTitle}) async {
+  await _repo.updateTaskAssignedUser(taskId: taskId, assignedUserId: assignedUserId);
+  final actorName = await _getActorName();
+  String? targetUserName;
+  if (assignedUserId != null) {
+    targetUserName = await _repo.fetchActorName(assignedUserId);
   }
+  await _repo.logActivity(
+    boardId: _boardId, taskId: taskId,
+    taskTitle: taskTitle,
+    eventType: assignedUserId != null ? 'task_assigned' : 'task_unassigned',
+    actorUserId: _userId, actorName: actorName,
+    targetUserName: targetUserName,      
+  );
+  _ref.invalidate(boardsProvider);
+}
 
-  /// Elimina una tarea con optimistic update:
-  /// la quita de la UI inmediatamente y luego hace el DELETE en Supabase.
+Future<void> updateStatus(String taskId, String newStatus, {String? taskTitle}) async {
+  await _repo.updateTaskStatus(taskId, newStatus);
+  final actorName = await _getActorName();
+  await _repo.logActivity(
+    boardId: _boardId, taskId: taskId,
+    taskTitle: taskTitle,
+    eventType: newStatus == 'completed' ? 'task_completed' : 'task_status_changed',
+    actorUserId: _userId, actorName: actorName,
+  );
+  _ref.invalidate(boardsProvider);
+}
+
   Future<void> deleteTask(String taskId) async {
-    // 1. Quitar de la UI de inmediato (optimistic)
     _ref.read(_deletedTaskIdsProvider(_boardId).notifier).update(
           (ids) => {...ids, taskId},
         );
-
     try {
-      // 2. Borrar en la BD
+      final actorName = await _getActorName();
       await _repo.deleteTask(taskId);
+      await _repo.logActivity(
+        boardId: _boardId,
+        taskId: taskId,
+        eventType: 'task_deleted',
+        actorUserId: _userId,
+        actorName: actorName,
+      );
       _ref.invalidate(boardsProvider);
     } catch (e) {
-      // 3. Si falla, revertir el optimistic update
       _ref.read(_deletedTaskIdsProvider(_boardId).notifier).update(
             (ids) => ids.where((id) => id != taskId).toSet(),
           );

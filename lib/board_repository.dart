@@ -54,6 +54,9 @@ class Task {
   final DateTime createdAt;
   final DateTime? completedAt;
 
+  /// Usuario asignado (solo 1). Null si no está asignada.
+  final String? assignedUserId;
+
   Task({
     required this.id,
     required this.boardId,
@@ -64,6 +67,7 @@ class Task {
     required this.createdBy,
     required this.createdAt,
     this.completedAt,
+    this.assignedUserId,
   });
 
   bool get isCompleted => status == 'completed';
@@ -83,9 +87,11 @@ class Task {
       completedAt: json['completed_at'] != null
           ? DateTime.parse(json['completed_at'])
           : null,
+      assignedUserId: json['assigned_user_id']?.toString(),
     );
   }
 }
+
 
 class BoardStats {
   final int total;
@@ -116,23 +122,48 @@ class BoardStats {
 }
 
 class BoardRepository {
-  final SupabaseClient _client;
+  BoardRepository(this.client);        // ← client público, no client
+  final SupabaseClient client;
 
-  BoardRepository(this._client);
+Future<void> logActivity({
+  required String boardId,
+  String? taskId,
+  String? taskTitle,
+  required String eventType,
+  required String actorUserId,
+  required String actorName,
+  String? targetUserName,
+}) async {
+  debugPrint('[logActivity] eventType=$eventType actorName=$actorName taskTitle=$taskTitle');
+  try {
+    await client.from('activity_log').insert({
+      'board_id': boardId,
+      'task_id': taskId,
+      'task_title': taskTitle,
+      'event_type': eventType,
+      'actor_user_id': actorUserId,
+      'actor_name': actorName,
+      'target_user_name': targetUserName,
+    });
+    debugPrint('[logActivity] ✅ insertado');
+  } catch (e) {
+    debugPrint('[logActivity] ❌ error: $e');
+  }
+}
 
 
   // ── Tableros ─────────────────────────────────────────
 
   Future<List<Board>> getBoards(String userId) async {
     // Tableros propios
-    final ownedResponse = await _client
+    final ownedResponse = await client
         .from('boards')
         .select('*')
         .eq('created_by', userId)
         .order('created_at', ascending: false);
 
     // Tableros donde es miembro
-    final memberResponse = await _client
+    final memberResponse = await client
         .from('board_members')
         .select('board_id, boards(*)')
         .eq('user_id', userId);
@@ -150,12 +181,12 @@ class BoardRepository {
 
     final boards = <Board>[];
     for (final json in allJsons) {
-      final tasksResponse = await _client
+      final tasksResponse = await client
           .from('tasks')
           .select('id')
           .eq('board_id', json['id']);
 
-      final completedResponse = await _client
+      final completedResponse = await client
           .from('tasks')
           .select('id')
           .eq('board_id', json['id'])
@@ -178,7 +209,7 @@ class BoardRepository {
   }
 
   Future<BoardStats> getBoardStats(String boardId) async {
-    final res = await _client
+    final res = await client
         .rpc('get_board_stats', params: {'board_uuid': boardId});
 
     // Supabase rpc returns a List of rows for table returns
@@ -190,28 +221,37 @@ class BoardRepository {
   }
 
   Future<Board> createBoard({
-    required String name,
-    String? description,
-    required String emoji,
-    required String userId,
-  }) async {
-    // Generar código de invitación aleatorio de 6 caracteres
-    final inviteCode = _generateCode();
+  required String name,
+  String? description,
+  required String emoji,
+  required String userId,
+}) async {
+  final inviteCode = _generateCode();
 
-    final response = await _client
-        .from(SupabaseConstants.boardsTable)
-        .insert({
-          'name': name,
-          'description': description,
-          'emoji': emoji,
-          'created_by': userId,
-          'invite_code': inviteCode,
-        })
-        .select()
-        .single();
+  final response = await client
+      .from(SupabaseConstants.boardsTable)
+      .insert({
+        'name': name,
+        'description': description,
+        'emoji': emoji,
+        'created_by': userId,
+        'invite_code': inviteCode,
+      })
+      .select()
+      .single();
 
-    return Board.fromJson(response);
-  }
+  final board = Board.fromJson(response);
+
+  // Inserta al creador como miembro del tablero
+  await client
+      .from('board_members')
+      .insert({
+        'board_id': board.id,
+        'user_id': userId,
+      });
+
+  return board;
+}
 
   // ── Invitaciones ─────────────────────────────────────
 
@@ -221,7 +261,7 @@ class BoardRepository {
     required String userId,
   }) async {
     // Buscar tablero por código
-    final boardResponse = await _client
+    final boardResponse = await client
         .from('boards')
         .select('*')
         .eq('invite_code', code.toUpperCase().trim())
@@ -239,7 +279,7 @@ class BoardRepository {
     }
 
     // Verificar que no sea ya miembro
-    final existing = await _client
+    final existing = await client
         .from('board_members')
         .select('id')
         .eq('board_id', boardId)
@@ -251,7 +291,7 @@ class BoardRepository {
     }
 
     // Insertar miembro
-    await _client.from('board_members').insert({
+    await client.from('board_members').insert({
       'board_id': boardId,
       'user_id': userId,
     });
@@ -261,7 +301,7 @@ class BoardRepository {
 
   // Obtener código de invitación de un tablero
   Future<String?> getInviteCode(String boardId) async {
-    final response = await _client
+    final response = await client
         .from('boards')
         .select('invite_code')
         .eq('id', boardId)
@@ -284,7 +324,7 @@ class BoardRepository {
   // ── Tareas ───────────────────────────────────────────
 
   Future<List<Task>> getTasks(String boardId) async {
-    final response = await _client
+    final response = await client
         .from(SupabaseConstants.tasksTable)
         .select('*')
         .eq('board_id', boardId)
@@ -294,42 +334,87 @@ class BoardRepository {
   }
 
   Future<Task> createTask({
-    required String boardId,
-    required String title,
-    String? description,
-    required String priority,
-    required String userId,
-  }) async {
-    final response = await _client
-        .from(SupabaseConstants.tasksTable)
-        .insert({
-          'board_id': boardId,
-          'title': title,
-          'description': description,
-          'priority': priority,
-          'created_by': userId,
-        })
-        .select()
-        .single();
+  required String boardId,
+  required String title,
+  String? description,
+  required String priority,
+  required String userId,
+}) async {
+  final response = await client
+      .from(SupabaseConstants.tasksTable)
+      .insert({
+        'board_id': boardId,
+        'title': title,
+        'description': description,
+        'priority': priority,
+        'created_by': userId,
+      })
+      .select()
+      .single();
 
-    return Task.fromJson(response);
+  return Task.fromJson(response);
+}
+
+  /// Lista miembros del tablero.
+ Future<List<Map<String, dynamic>>> fetchBoardMembers(String boardId) async {
+  final members = await client
+      .from('board_members')
+      .select('user_id')
+      .eq('board_id', boardId);
+
+  final result = <Map<String, dynamic>>[];
+
+  for (final member in members as List) {
+    final userId = member['user_id'] as String;
+
+    final profile = await client
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('id', userId)
+        .maybeSingle();
+
+    result.add({
+      'user_id': userId,
+      'profiles': profile,
+    });
   }
 
-  Future<void> updateTaskStatus(String taskId, String newStatus) async {
-    await _client
-        .from(SupabaseConstants.tasksTable)
-        .update({
-          'status': newStatus,
-          if (newStatus == 'completed')
-            'completed_at': DateTime.now().toIso8601String()
-          else
-            'completed_at': null,
-        })
-        .eq('id', taskId);
-  }
+  debugPrint('[fetchBoardMembers] members=$result');
+  return result;
+}
+
+
+
+  Future<void> updateTaskAssignedUser({
+  required String taskId,
+  required String? assignedUserId,
+}) async {
+  await client
+      .from(SupabaseConstants.tasksTable)
+      .update({
+        'assigned_user_id': assignedUserId,
+      })
+      .eq('id', taskId);
+}
+  Future<void> updateTaskStatus(
+  String taskId,
+  String newStatus,
+) async {
+  await client
+      .from(SupabaseConstants.tasksTable)
+      .update({
+        'status': newStatus,
+        if (newStatus == 'completed')
+          'completed_at': DateTime.now().toIso8601String()
+        else
+          'completed_at': null,
+      })
+      .eq('id', taskId);
+}
+
 
   Future<void> deleteTask(String taskId) async {
-    await _client
+    await client
         .from(SupabaseConstants.tasksTable)
         .delete()
         .eq('id', taskId);
@@ -338,7 +423,7 @@ class BoardRepository {
   // ── Realtime ─────────────────────────────────────────
 
   Stream<List<Task>> watchTasks(String boardId) {
-    return _client
+    return client
         .from('tasks')
         .stream(primaryKey: ['id'])
         .eq('board_id', boardId)
@@ -348,4 +433,12 @@ class BoardRepository {
           debugPrint('🔴 Realtime error: $error');
         });
   }
+  Future<String> fetchActorName(String userId) async {
+  final profile = await client
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', userId)
+      .maybeSingle();
+  return (profile?['full_name'] ?? profile?['email'] ?? 'Usuario').toString();
+}
 }

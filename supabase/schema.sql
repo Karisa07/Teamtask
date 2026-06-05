@@ -135,16 +135,73 @@ create table public.tasks (
   created_at   timestamptz default now()
 );
 
+-- ─────────────────────────────────────────────────────────────
+-- TT-14: Activity log (historial de actividad del tablero)
+-- ─────────────────────────────────────────────────────────────
+
+create table public.activity_log (
+  id uuid primary key default gen_random_uuid(),
+  board_id uuid not null references public.boards(id) on delete cascade,
+  task_id uuid references public.tasks(id) on delete cascade,
+  event_type text not null check (event_type in (
+    'task_created',
+    'task_completed',
+    'task_assigned'
+  )),
+  actor_user_id uuid not null references auth.users(id) on delete cascade,
+  target_user_id uuid references auth.users(id) on delete cascade,
+  created_at timestamptz default now()
+);
+
+alter table public.activity_log enable row level security;
+
+-- Lectura actividad: owner o miembro del tablero
+create policy "Actividad - ver tableros (owner o miembro)"
+  on public.activity_log for select
+  using (
+    exists (
+      select 1
+      from public.boards b
+      where b.id = activity_log.board_id
+        and (
+          b.created_by = auth.uid()
+          or exists (
+            select 1
+            from public.board_members bm
+            where bm.board_id = b.id
+              and bm.user_id = auth.uid()
+          )
+        )
+    )
+  );
+
+
 -- RLS tasks
 alter table public.tasks enable row level security;
 
-create policy "Ver tareas de mis tableros"
+create policy "Ver tareas (owner o miembro)"
   on public.tasks for select
   using (
-    board_id in (
-      select id from public.boards where created_by = auth.uid()
+    exists (
+      select 1
+      from public.boards b
+      where b.id = tasks.board_id
+        and (
+          b.created_by = auth.uid()
+          or exists (
+            select 1
+            from public.board_members bm
+            where bm.board_id = b.id
+              and bm.user_id = auth.uid()
+          )
+        )
     )
   );
+
+
+-- No creamos políticas de INSERT/UPDATE para el cliente.
+-- Los inserts en activity_log serán vía triggers (security definer).
+
 
 create policy "Crear tareas en mis tableros"
   on public.tasks for insert
@@ -170,10 +227,213 @@ create policy "Eliminar tareas"
     )
   );
 
+-- ─────────────────────────────────────────────────────────────
+-- TT-14-2: Triggers para registrar actividad
+-- ─────────────────────────────────────────────────────────────
+
+-- task_created
+create or replace function public.activity_log_task_created()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  insert into public.activity_log (
+    board_id,
+    task_id,
+    event_type,
+    actor_user_id,
+    target_user_id
+  ) values (
+    new.board_id,
+    new.id,
+    'task_created',
+    new.created_by,
+    null
+  );
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_activity_task_created on public.tasks;
+create trigger trg_activity_task_created
+after insert on public.tasks
+for each row
+execute function public.activity_log_task_created();
+
+-- task_completed (cuando status cambia a completed)
+create or replace function public.activity_log_task_completed()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  if new.status = 'completed' and old.status is distinct from new.status then
+    insert into public.activity_log (
+      board_id,
+      task_id,
+      event_type,
+      actor_user_id,
+      target_user_id
+    ) values (
+      new.board_id,
+      new.id,
+      'task_completed',
+      new.created_by,
+      null
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_activity_task_completed on public.tasks;
+create trigger trg_activity_task_completed
+after update of status
+on public.tasks
+for each row
+execute function public.activity_log_task_completed();
+
+-- ─────────────────────────────────────────────────────────────
+-- Assignación
+-- ─────────────────────────────────────────────────────────────
+
+-- board_members (miembros con acceso al tablero)
+create table public.board_members (
+  id uuid primary key default gen_random_uuid(),
+  board_id uuid not null references public.boards(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text,
+  joined_at timestamptz default now(),
+  unique (board_id, user_id)
+);
+
+alter table public.board_members enable row level security;
+
+-- Miembros pueden leer el tablero a través de board_members
+create policy "Board members - leer" on public.board_members
+  for select
+  using (
+    board_id in (
+      select b.id from public.boards b where b.created_by = auth.uid()
+    )
+    or exists (
+      select 1 from public.board_members bm
+      where bm.board_id = board_members.board_id
+        and bm.user_id = auth.uid()
+    )
+  );
+
+-- Insert solo cuando el miembro se une por invite (app usa insert desde cliente)
+create policy "Board members - crear" on public.board_members
+  for insert
+  with check (
+    board_id in (
+      select b.id from public.boards b where b.created_by = auth.uid()
+    )
+    or true
+  );
+
+-- tasks.assigned_user_id (solo 1 asignado)
+alter table public.tasks
+  add column if not exists assigned_user_id uuid references auth.users(id);
+
+-- Miembros del tablero pueden leer assigned_user_id
+create policy "Tareas - leer (owner o miembro)" on public.tasks
+  for select
+  using (
+    exists (
+      select 1
+      from public.boards b
+      where b.id = tasks.board_id
+        and (
+          b.created_by = auth.uid()
+          or exists (
+            select 1 from public.board_members bm
+            where bm.board_id = b.id
+              and bm.user_id = auth.uid()
+          )
+        )
+    )
+  );
+
+-- Miembros del tablero pueden actualizar tareas (incl. assigned_user_id)
+create policy "Tareas - actualizar (owner o miembro)" on public.tasks
+  for update
+  using (
+    exists (
+      select 1
+      from public.boards b
+      where b.id = tasks.board_id
+        and (
+          b.created_by = auth.uid()
+          or exists (
+            select 1 from public.board_members bm
+            where bm.board_id = b.id
+              and bm.user_id = auth.uid()
+          )
+        )
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.boards b
+      where b.id = tasks.board_id
+        and (
+          b.created_by = auth.uid()
+          or exists (
+            select 1 from public.board_members bm
+            where bm.board_id = b.id
+              and bm.user_id = auth.uid()
+          )
+        )
+    )
+  );
+
+
+-- Trigger task_assigned: cuando assigned_user_id cambia
+create or replace function public.activity_log_task_assigned()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  if new.assigned_user_id is distinct from old.assigned_user_id then
+    insert into public.activity_log (
+      board_id,
+      task_id,
+      event_type,
+      actor_user_id,
+      target_user_id
+    ) values (
+      new.board_id,
+      new.id,
+      'task_assigned',
+      auth.uid(),
+      new.assigned_user_id
+    );
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_activity_task_assigned on public.tasks;
+create trigger trg_activity_task_assigned
+after update of assigned_user_id
+on public.tasks
+for each row
+execute function public.activity_log_task_assigned();
+
+
 -- Habilitar Realtime
 alter publication supabase_realtime add table public.tasks;
 alter publication supabase_realtime add table public.boards;
 alter publication supabase_realtime add table public.notification_events;
+alter publication supabase_realtime add table public.activity_log;
+
 
 -- ─────────────────────────────────────────────────────────────
 -- Retorna counts por estado y porcentaje completadas

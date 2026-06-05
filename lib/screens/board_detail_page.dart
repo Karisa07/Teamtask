@@ -10,8 +10,13 @@ import 'package:teamtask/profile_provider.dart';
 import 'package:teamtask/auth_provider.dart';
 import 'package:teamtask/app_theme.dart';
 import 'package:teamtask/screens/create_task_sheet.dart';
+import 'package:teamtask/screens/activity_feed_widget.dart';
+import 'package:teamtask/screens/assign_task_sheet.dart';
+import 'package:teamtask/widgets/task_assigned_chip.dart';
+
 
 class BoardDetailPage extends ConsumerWidget {
+
   final String boardId;
   final String boardName;
   final String? focusTaskId;
@@ -26,9 +31,7 @@ class BoardDetailPage extends ConsumerWidget {
   void _showInviteCode(BuildContext context, WidgetRef ref) async {
     final repo = ref.read(boardRepositoryProvider);
     final code = await repo.getInviteCode(boardId);
-
     if (!context.mounted) return;
-
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -36,32 +39,23 @@ class BoardDetailPage extends ConsumerWidget {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               decoration: BoxDecoration(
                 color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const Gap(20),
-            const Icon(
-              Icons.group_add_outlined,
-              size: 40,
-              color: AppTheme.primaryColor,
-            ),
+            const Icon(Icons.group_add_outlined, size: 40, color: AppTheme.primaryColor),
             const Gap(12),
-            const Text(
-              'Código de invitación',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
+            const Text('Código de invitación',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
             const Gap(6),
             Text(
               'Comparte este código para que otros\nse unan al tablero',
@@ -69,7 +63,6 @@ class BoardDetailPage extends ConsumerWidget {
               style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
             ),
             const Gap(24),
-
             GestureDetector(
               onTap: () {
                 Clipboard.setData(ClipboardData(text: code ?? ''));
@@ -85,10 +78,7 @@ class BoardDetailPage extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppTheme.primaryColor.withOpacity(0.2),
-                    width: 2,
-                  ),
+                  border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2), width: 2),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -96,27 +86,19 @@ class BoardDetailPage extends ConsumerWidget {
                     Text(
                       code ?? '------',
                       style: const TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 10,
-                        color: AppTheme.primaryColor,
+                        fontSize: 36, fontWeight: FontWeight.w900,
+                        letterSpacing: 10, color: AppTheme.primaryColor,
                       ),
                     ),
                     const Gap(12),
-                    const Icon(
-                      Icons.copy,
-                      color: AppTheme.primaryColor,
-                      size: 20,
-                    ),
+                    const Icon(Icons.copy, color: AppTheme.primaryColor, size: 20),
                   ],
                 ),
               ),
             ),
             const Gap(12),
-            Text(
-              'Toca el código para copiarlo',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-            ),
+            Text('Toca el código para copiarlo',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
             const Gap(24),
           ],
         ),
@@ -131,28 +113,16 @@ class BoardDetailPage extends ConsumerWidget {
     final tasksByStatus = ref.watch(tasksByStatusProvider(boardId));
 
     final stats = statsAsync.valueOrNull ??
-        const BoardStats(
-          total: 0,
-          pending: 0,
-          inProgress: 0,
-          completed: 0,
-          percentage: 0,
-        );
+        const BoardStats(total: 0, pending: 0, inProgress: 0, completed: 0, percentage: 0);
 
     final profileAsync = ref.watch(profileProvider);
     final currentUser = ref.watch(currentUserProvider);
-
     final boardsAsync = ref.watch(boardsProvider);
+
     final isOwner = boardsAsync.valueOrNull
             ?.firstWhere(
               (b) => b.id == boardId,
-              orElse: () => Board(
-                id: '',
-                name: '',
-                emoji: '',
-                createdBy: '',
-                createdAt: DateTime.now(),
-              ),
+              orElse: () => Board(id: '', name: '', emoji: '', createdBy: '', createdAt: DateTime.now()),
             )
             .createdBy ==
         currentUser?.id;
@@ -186,11 +156,7 @@ class BoardDetailPage extends ConsumerWidget {
                       (profileAsync.valueOrNull?.fullName?.isNotEmpty == true)
                           ? profileAsync.valueOrNull!.fullName![0].toUpperCase()
                           : '?',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w700),
                     )
                   : null,
             ),
@@ -204,6 +170,7 @@ class BoardDetailPage extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          // ── Barra de progreso ────────────────────────────
           Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
             decoration: BoxDecoration(
@@ -218,18 +185,11 @@ class BoardDetailPage extends ConsumerWidget {
                   children: [
                     Text(
                       '${stats.completed} de ${stats.total} completadas',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                     Text(
                       '${(stats.percentage * 100).toInt()}%',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primaryColor,
-                      ),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.primaryColor),
                     ),
                   ],
                 ),
@@ -246,66 +206,147 @@ class BoardDetailPage extends ConsumerWidget {
                 const Gap(12),
                 Row(
                   children: [
-                    _StatChip(
-                      label: '${stats.pending} por hacer',
-                      color: Colors.grey.shade600,
-                    ),
+                    _StatChip(label: '${stats.pending} por hacer', color: Colors.grey.shade600),
                     const Gap(8),
-                    _StatChip(
-                      label: '${stats.inProgress} en progreso',
-                      color: AppTheme.warningColor,
-                    ),
+                    _StatChip(label: '${stats.inProgress} en progreso', color: AppTheme.warningColor),
                     const Gap(8),
-                    _StatChip(
-                      label: '${stats.completed} listas',
-                      color: AppTheme.successColor,
-                    ),
+                    _StatChip(label: '${stats.completed} listas', color: AppTheme.successColor),
                   ],
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: tasksAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
-              data: (_) => ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.all(16),
-                children: [
-                  _KanbanColumn(
-                    boardId: boardId,
-                    status: 'pending',
-                    label: 'Por hacer',
-                    emoji: '⏳',
-                    color: Colors.grey.shade600,
-                    focusTaskId: focusTaskId,
-                    tasks: tasksByStatus['pending'] ?? [],
-                  ),
-                  const Gap(12),
-                  _KanbanColumn(
-                    boardId: boardId,
-                    status: 'in_progress',
-                    label: 'En progreso',
-                    emoji: '🔄',
-                    color: AppTheme.warningColor,
-                    tasks: tasksByStatus['in_progress'] ?? [],
-                    focusTaskId: focusTaskId,
-                  ),
-                  const Gap(12),
-                  _KanbanColumn(
-                    boardId: boardId,
-                    status: 'completed',
-                    label: 'Completada',
-                    emoji: '✅',
-                    color: AppTheme.successColor,
-                    tasks: tasksByStatus['completed'] ?? [],
-                    focusTaskId: focusTaskId,
-                  ),
-                ],
-              ),
+
+          // ── Kanban + Activity en scroll vertical ─────────
+Expanded(
+  child: tasksAsync.when(
+    loading: () => const Center(
+      child: CircularProgressIndicator(),
+    ),
+    error: (e, _) => Center(
+      child: Text('Error: $e'),
+    ),
+    data: (_) => CustomScrollView(
+      slivers: [
+        // ── Kanban ─────────────────────────────
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: 420,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(16),
+              children: [
+                _KanbanColumn(
+                  boardId: boardId,
+                  status: 'pending',
+                  label: 'Por hacer',
+                  emoji: '⏳',
+                  color: Colors.grey.shade600,
+                  focusTaskId: focusTaskId,
+                  tasks: tasksByStatus['pending'] ?? [],
+                ),
+                const Gap(12),
+                _KanbanColumn(
+                  boardId: boardId,
+                  status: 'in_progress',
+                  label: 'En progreso',
+                  emoji: '🔄',
+                  color: AppTheme.warningColor,
+                  focusTaskId: focusTaskId,
+                  tasks: tasksByStatus['in_progress'] ?? [],
+                ),
+                const Gap(12),
+                _KanbanColumn(
+                  boardId: boardId,
+                  status: 'completed',
+                  label: 'Completada',
+                  emoji: '✅',
+                  color: AppTheme.successColor,
+                  focusTaskId: focusTaskId,
+                  tasks: tasksByStatus['completed'] ?? [],
+                ),
+              ],
             ),
           ),
+        ),
+
+        // ── Miembros ───────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: ref
+                  .read(boardRepositoryProvider)
+                  .fetchBoardMembers(boardId),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const SizedBox();
+                }
+
+                final members = snapshot.data!;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Miembros del tablero',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: members.map((m) {
+                        final profile =
+                            m['profiles'] as Map<String, dynamic>?;
+
+                        final name =
+                            profile?['full_name']?.toString() ??
+                            profile?['email']?.toString() ??
+                            'Usuario';
+
+                        return Tooltip(
+                          message: name,
+                          child: CircleAvatar(
+                            child: Text(
+                              name[0].toUpperCase(),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                    const SizedBox(height: 20),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+
+        // ── Actividad ──────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              24,
+            ),
+            child: ActivityFeed(
+              boardId: boardId,
+            ),
+          ),
+        ),
+      ],
+    ),
+  ),
+),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -321,6 +362,8 @@ class BoardDetailPage extends ConsumerWidget {
     );
   }
 }
+
+// ── KanbanColumn ─────────────────────────────────────────
 
 class _KanbanColumn extends ConsumerWidget {
   final String boardId;
@@ -358,14 +401,7 @@ class _KanbanColumn extends ConsumerWidget {
               children: [
                 Text(emoji),
                 const Gap(8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: color,
-                  ),
-                ),
+                Text(label, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: color)),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -375,11 +411,7 @@ class _KanbanColumn extends ConsumerWidget {
                   ),
                   child: Text(
                     '${tasks.length}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                    ),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
                   ),
                 ),
               ],
@@ -388,25 +420,13 @@ class _KanbanColumn extends ConsumerWidget {
           const Gap(10),
           Expanded(
             child: tasks.isEmpty
-                ? Center(
-                    child: Text(
-                      'Sin tareas',
-                      style: TextStyle(
-                        color: Colors.grey.shade400,
-                        fontSize: 13,
-                      ),
-                    ),
-                  )
+                ? Center(child: Text('Sin tareas', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)))
                 : ListView.separated(
                     itemCount: tasks.length,
                     separatorBuilder: (_, __) => const Gap(8),
                     itemBuilder: (context, index) {
                       final task = tasks[index];
-                      return _TaskCard(
-                        task: task,
-                        boardId: boardId,
-                        focusTaskId: focusTaskId,
-                      )
+                      return _TaskCard(task: task, boardId: boardId, focusTaskId: focusTaskId)
                           .animate(key: ValueKey(task.id))
                           .fadeIn(duration: 300.ms)
                           .slideX(begin: 0.1, end: 0);
@@ -419,16 +439,14 @@ class _KanbanColumn extends ConsumerWidget {
   }
 }
 
+// ── TaskCard ──────────────────────────────────────────────
+
 class _TaskCard extends ConsumerWidget {
   final Task task;
   final String boardId;
   final String? focusTaskId;
 
-  const _TaskCard({
-    required this.task,
-    required this.boardId,
-    required this.focusTaskId,
-  });
+  const _TaskCard({required this.task, required this.boardId, required this.focusTaskId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -438,12 +456,29 @@ class _TaskCard extends ConsumerWidget {
         : task.priority == 'medium'
             ? AppTheme.warningColor
             : AppTheme.successColor;
-
     final isFocused = focusTaskId != null && focusTaskId == task.id;
 
     return Dismissible(
-      key: Key(task.id),
+      key: ValueKey('dismissible_${task.id}'),
       direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Eliminar tarea'),
+            content: Text('¿Eliminar "${task.title}"?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Eliminar', style: TextStyle(color: AppTheme.errorColor)),
+              ),
+            ],
+          ),
+        );
+        if (confirm == true) await actions.deleteTask(task.id);
+        return false;
+      },
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
@@ -453,29 +488,6 @@ class _TaskCard extends ConsumerWidget {
         ),
         child: const Icon(Icons.delete_outline, color: AppTheme.errorColor),
       ),
-      confirmDismiss: (_) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Eliminar tarea'),
-            content: Text('¿Eliminar "${task.title}"?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancelar'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Eliminar',
-                  style: TextStyle(color: AppTheme.errorColor),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-      onDismissed: (_) => actions.deleteTask(task.id),
       child: Card(
         margin: EdgeInsets.zero,
         shape: isFocused
@@ -484,11 +496,12 @@ class _TaskCard extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
               )
             : RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _showStatusOptions(context, actions),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => _showStatusOptions(context, actions),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -501,40 +514,20 @@ class _TaskCard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        task.priority == 'high'
-                            ? 'Alta'
-                            : task.priority == 'medium'
-                                ? 'Media'
-                                : 'Baja',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: priorityColor,
-                        ),
+                        task.priority == 'high' ? 'Alta' : task.priority == 'medium' ? 'Media' : 'Baja',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: priorityColor),
                       ),
                     ),
                     const Spacer(),
                     GestureDetector(
                       onTap: () {
-                        final next = task.isPending
-                            ? 'in_progress'
-                            : task.isInProgress
-                                ? 'completed'
-                                : 'pending';
+                        final next = task.isPending ? 'in_progress' : task.isInProgress ? 'completed' : 'pending';
                         actions.updateStatus(task.id, next);
                       },
                       child: Icon(
-                        task.isCompleted
-                            ? Icons.check_circle
-                            : task.isInProgress
-                                ? Icons.sync
-                                : Icons.radio_button_unchecked,
+                        task.isCompleted ? Icons.check_circle : task.isInProgress ? Icons.sync : Icons.radio_button_unchecked,
                         size: 20,
-                        color: task.isCompleted
-                            ? AppTheme.successColor
-                            : task.isInProgress
-                                ? AppTheme.warningColor
-                                : Colors.grey.shade400,
+                        color: task.isCompleted ? AppTheme.successColor : task.isInProgress ? AppTheme.warningColor : Colors.grey.shade400,
                       ),
                     ),
                   ],
@@ -543,24 +536,22 @@ class _TaskCard extends ConsumerWidget {
                 Text(
                   task.title,
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    decoration: task.isCompleted
-                        ? TextDecoration.lineThrough
-                        : null,
+                    fontSize: 14, fontWeight: FontWeight.w600,
+                    decoration: task.isCompleted ? TextDecoration.lineThrough : null,
                     color: task.isCompleted ? Colors.grey.shade400 : null,
                   ),
                 ),
+                const Gap(6),
+                TaskAssignedChip(task: task, boardId: boardId),
+
+
                 if (task.description != null) ...[
                   const Gap(6),
                   Text(
                     task.description!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                   ),
                 ],
               ],
@@ -585,75 +576,41 @@ class _TaskCard extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
             ),
             const Gap(20),
-            Text(
-              task.title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
+            Text(task.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const Gap(20),
-            _StatusOption(
-              emoji: '⏳',
-              label: 'Por hacer',
-              isSelected: task.isPending,
-              onTap: () {
-                Navigator.pop(ctx);
-                actions.updateStatus(task.id, 'pending');
-              },
-            ),
-            _StatusOption(
-              emoji: '🔄',
-              label: 'En progreso',
-              isSelected: task.isInProgress,
-              onTap: () {
-                Navigator.pop(ctx);
-                actions.updateStatus(task.id, 'in_progress');
-              },
-            ),
-            _StatusOption(
-              emoji: '✅',
-              label: 'Completada',
-              isSelected: task.isCompleted,
-              onTap: () {
-                Navigator.pop(ctx);
-                actions.updateStatus(task.id, 'completed');
-              },
-            ),
+            _StatusOption(emoji: '⏳', label: 'Por hacer', isSelected: task.isPending,
+                onTap: () { Navigator.pop(ctx); actions.updateStatus(task.id, 'pending'); }),
+            _StatusOption(emoji: '🔄', label: 'En progreso', isSelected: task.isInProgress,
+                onTap: () { Navigator.pop(ctx); actions.updateStatus(task.id, 'in_progress'); }),
+            _StatusOption(emoji: '✅', label: 'Completada', isSelected: task.isCompleted,
+                onTap: () { Navigator.pop(ctx); actions.updateStatus(task.id, 'completed'); }),
             const Gap(8),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: AppTheme.errorColor),
               title: const Text('Eliminar', style: TextStyle(color: AppTheme.errorColor)),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(ctx);
-                Future.delayed(const Duration(milliseconds: 300), () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (d) => AlertDialog(
-                      title: const Text('Eliminar tarea'),
-                      content: Text('¿Eliminar "${task.title}"?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(d, false),
-                          child: const Text('Cancelar'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(d, true),
-                          child: const Text(
-                            'Eliminar',
-                            style: TextStyle(color: AppTheme.errorColor),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) actions.deleteTask(task.id);
-                });
+                await Future.delayed(const Duration(milliseconds: 300));
+                if (!context.mounted) return;
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (d) => AlertDialog(
+                    title: const Text('Eliminar tarea'),
+                    content: Text('¿Eliminar "${task.title}"?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
+                      TextButton(
+                        onPressed: () => Navigator.pop(d, true),
+                        child: const Text('Eliminar', style: TextStyle(color: AppTheme.errorColor)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) actions.deleteTask(task.id);
               },
             ),
           ],
@@ -663,35 +620,29 @@ class _TaskCard extends ConsumerWidget {
   }
 }
 
+// ── StatusOption ──────────────────────────────────────────
+
 class _StatusOption extends StatelessWidget {
   final String emoji;
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _StatusOption({
-    required this.emoji,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
+  const _StatusOption({required this.emoji, required this.label, required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       leading: Text(emoji, style: const TextStyle(fontSize: 20)),
-      title: Text(
-        label,
-        style: TextStyle(
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        ),
-      ),
+      title: Text(label, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500)),
       trailing: isSelected ? const Icon(Icons.check, color: AppTheme.primaryColor) : null,
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 }
+
+// ── StatChip ──────────────────────────────────────────────
 
 class _StatChip extends StatelessWidget {
   final String label;
@@ -703,21 +654,13 @@ class _StatChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
     );
   }
 }
+
+// ── RealtimeIndicator ─────────────────────────────────────
 
 class _RealtimeIndicator extends StatefulWidget {
   final bool isConnected;
@@ -727,17 +670,13 @@ class _RealtimeIndicator extends StatefulWidget {
   State<_RealtimeIndicator> createState() => _RealtimeIndicatorState();
 }
 
-class _RealtimeIndicatorState extends State<_RealtimeIndicator>
-    with SingleTickerProviderStateMixin {
+class _RealtimeIndicatorState extends State<_RealtimeIndicator> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..repeat(reverse: true);
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
   }
 
   @override
@@ -754,8 +693,7 @@ class _RealtimeIndicatorState extends State<_RealtimeIndicator>
         AnimatedBuilder(
           animation: _controller,
           builder: (_, __) => Container(
-            width: 8,
-            height: 8,
+            width: 8, height: 8,
             decoration: BoxDecoration(
               color: widget.isConnected
                   ? AppTheme.successColor.withOpacity(0.5 + _controller.value * 0.5)
@@ -768,8 +706,7 @@ class _RealtimeIndicatorState extends State<_RealtimeIndicator>
         Text(
           widget.isConnected ? 'En vivo' : 'Conectando...',
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+            fontSize: 12, fontWeight: FontWeight.w600,
             color: widget.isConnected ? AppTheme.successColor : Colors.grey.shade400,
           ),
         ),
@@ -777,4 +714,3 @@ class _RealtimeIndicatorState extends State<_RealtimeIndicator>
     );
   }
 }
-

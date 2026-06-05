@@ -23,7 +23,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _loadingEmail = false;
   bool _loadingGoogle = false;
   bool _loadingGitHub = false;
-  bool _loadingApple = false;
+  //
   String? _error;
 
   @override
@@ -36,7 +36,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   // Helpers
 
   bool get _anyLoading =>
-      _loadingEmail || _loadingGoogle || _loadingGitHub || _loadingApple;
+      _loadingEmail || _loadingGoogle || _loadingGitHub ;
 
   void _setError(Object e) {
     final svc = ref.read(authServiceProvider);
@@ -82,16 +82,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
-  Future<void> _loginApple() async {
-    setState(() { _loadingApple = true; _error = null; });
-    try {
-      await ref.read(authServiceProvider).signInWithApple();
-    } catch (e) {
-      _setError(e);
-    } finally {
-      if (mounted) setState(() => _loadingApple = false);
-    }
-  }
 
   // UI 
 
@@ -205,17 +195,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
               const Gap(12),
 
-              _OAuthButton(
-                label: 'Continuar con Apple',
-                icon: FontAwesomeIcons.apple,
-                color: AppTheme.appleBlack,
-                loading: _loadingApple,
-                disabled: _anyLoading,
-                onPressed: _loginApple,
-                note: 'Solo iOS / macOS',
-              ).animate().fadeIn(delay: 420.ms).slideX(begin: 0.08, end: 0),
-
-              const Gap(36),
 
               //Link a registro
               Center(
