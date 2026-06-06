@@ -99,8 +99,8 @@ class HomeNotificationsSection extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            'En vivo: esta sección mostrará qué usuario hizo qué acción en qué tablero.',
+         Text(
+            '',
             style: TextStyle(
               fontSize: 13,
               color: Colors.grey.shade600,

@@ -321,8 +321,7 @@ class BoardDetailPage extends ConsumerWidget {
     );
   }
 }
-
-// ── KanbanColumn ─────────────────────────────────────────
+// ── KanbanColumn ──────────────────────────────────────────
 
 class _KanbanColumn extends ConsumerWidget {
   final String boardId;
@@ -330,8 +329,8 @@ class _KanbanColumn extends ConsumerWidget {
   final String label;
   final String emoji;
   final Color color;
-  final String? focusTaskId;
   final List<Task> tasks;
+  final String? focusTaskId;
 
   const _KanbanColumn({
     required this.boardId,
@@ -340,47 +339,45 @@ class _KanbanColumn extends ConsumerWidget {
     required this.emoji,
     required this.color,
     required this.tasks,
-    required this.focusTaskId,
+    this.focusTaskId,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final anchoColumna = MediaQuery.of(context).size.width * 0.78;
+
     return SizedBox(
-      width: 280,
+      width: anchoColumna,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
+          // ── Encabezado ──
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
             child: Row(
               children: [
-                Text(emoji),
-                const Gap(8),
+                Text(emoji, style: const TextStyle(fontSize: 16)),
+                const Gap(6),
                 Text(
                   label,
                   style: TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    fontSize: 13,
                     color: color,
                   ),
                 ),
-                const Spacer(),
+                const Gap(6),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 2),
+                      horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     '${tasks.length}',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: color,
                     ),
@@ -389,30 +386,38 @@ class _KanbanColumn extends ConsumerWidget {
               ],
             ),
           ),
-          const Gap(10),
+
+          // ── Lista de tareas ──
           Expanded(
             child: tasks.isEmpty
                 ? Center(
-                    child: Text(
-                      'Sin tareas',
-                      style: TextStyle(
-                          color: Colors.grey.shade400, fontSize: 13),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.inbox_outlined,
+                            size: 36, color: Colors.grey.shade300),
+                        const Gap(8),
+                        Text(
+                          'Sin tareas',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 : ListView.separated(
                     itemCount: tasks.length,
-                    separatorBuilder: (_, __) => const Gap(8),
-                    itemBuilder: (context, index) {
-                      final task = tasks[index];
-                      return _TaskCard(
-                        task: task,
-                        boardId: boardId,
-                        focusTaskId: focusTaskId,
-                      )
-                          .animate(key: ValueKey(task.id))
-                          .fadeIn(duration: 300.ms)
-                          .slideX(begin: 0.1, end: 0);
-                    },
+                    separatorBuilder: (_, __) => const Gap(10),
+                    itemBuilder: (_, index) => _TaskCard(
+                      task: tasks[index],
+                      boardId: boardId,
+                      focusTaskId: focusTaskId,
+                    )
+                        .animate()
+                        .fadeIn(delay: (index * 50).ms)
+                        .slideY(begin: 0.1, end: 0),
                   ),
           ),
         ],
@@ -420,6 +425,7 @@ class _KanbanColumn extends ConsumerWidget {
     );
   }
 }
+
 
 // ── TaskCard ──────────────────────────────────────────────
 
@@ -770,36 +776,37 @@ class _RealtimeIndicatorState extends State<_RealtimeIndicator>
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedBuilder(
-          animation: _controller,
-          builder: (_, __) => Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: widget.isConnected
-                  ? AppTheme.successColor
-                      .withOpacity(0.5 + _controller.value * 0.5)
-                  : Colors.grey,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-        const Gap(6),
-        Text(
-          widget.isConnected ? 'En vivo' : 'Conectando...',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+Widget build(BuildContext context) {
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      // Solo este Container se rebuilda 60 veces/segundo — no el Text
+      AnimatedBuilder(
+        animation: _controller,
+        builder: (_, __) => Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
             color: widget.isConnected
-                ? AppTheme.successColor
-                : Colors.grey.shade400,
+                ? AppTheme.successColor.withOpacity(0.5 + _controller.value * 0.5)
+                : Colors.grey,
+            shape: BoxShape.circle,
           ),
         ),
-      ],
-    );
-  }
+      ),
+      const Gap(6),
+      // Este Text queda FUERA del AnimatedBuilder — ya no se rebuilda
+      Text(
+        widget.isConnected ? 'En vivo' : 'Conectando...',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: widget.isConnected
+              ? AppTheme.successColor
+              : Colors.grey.shade400,
+        ),
+      ),
+    ],
+  );
 }
+    }

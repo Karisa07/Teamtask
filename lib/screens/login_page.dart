@@ -39,9 +39,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       _loadingEmail || _loadingGoogle || _loadingGitHub ;
 
   void _setError(Object e) {
-    final svc = ref.read(authServiceProvider);
-    setState(() => _error = svc.parseError(e));
-  }
+  debugPrint('ERROR LOGIN => $e');
+
+  setState(() {
+    _error = e.toString();
+  });
+}
 
   //  Acciones 
 

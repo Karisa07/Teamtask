@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:teamtask/screens/login_page.dart';
@@ -12,24 +14,39 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _isLoggedIn = false;
+  late final StreamSubscription<AuthState> _authSub;
+  late final StreamSubscription<Uri> _linkSub;
+  final _appLinks = AppLinks();
 
   @override
   void initState() {
     super.initState();
 
-    _isLoggedIn =
-        Supabase.instance.client.auth.currentSession != null;
-    debugPrint('🔴 AuthGate init - sesión: $_isLoggedIn');
+    _isLoggedIn = Supabase.instance.client.auth.currentSession != null;
 
-    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      debugPrint(
-          '🔴 AuthState cambió: ${data.event} - sesión: ${data.session?.user.email}');
+    // Escucha cambios de autenticación
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (mounted) {
         setState(() {
           _isLoggedIn = data.session != null;
         });
       }
     });
+
+    // Escucha deep links entrantes (callback de OAuth)
+    _linkSub = _appLinks.uriLinkStream.listen((uri) async {
+      debugPrint('🔗 Deep link recibido: $uri');
+      if (uri.scheme == 'io.supabase.teamtask') {
+        await Supabase.instance.client.auth.getSessionFromUrl(uri);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub.cancel();
+    _linkSub.cancel();
+    super.dispose();
   }
 
   @override

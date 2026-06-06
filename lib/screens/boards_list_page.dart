@@ -156,7 +156,7 @@ class BoardsListPage extends ConsumerWidget {
             foregroundColor: AppTheme.primaryColor,
             elevation: 2,
             tooltip: 'Unirse con código',
-            child: const Icon(Icons.group_add_outlined),
+            child: const Icon(Icons.add_box_outlined),
           ),
           const Gap(12),
           FloatingActionButton.extended(

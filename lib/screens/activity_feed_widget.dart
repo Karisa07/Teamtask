@@ -20,12 +20,17 @@ class ActivityFeed extends ConsumerStatefulWidget {
 
 class _ActivityFeedState extends ConsumerState<ActivityFeed> {
   @override
-  void initState() {
-    super.initState();
-    // Registrar mensajes en español para timeago
-    timeago.setLocaleMessages('es', timeago.EsMessages());
-  }
+  bool _localeRegistered = false;
 
+@override
+void initState() {
+  super.initState();
+
+  if (!_localeRegistered) {
+    timeago.setLocaleMessages('es', timeago.EsMessages());
+    _localeRegistered = true;
+  }
+}
   @override
   Widget build(BuildContext context) {
     final feedAsync = ref.watch(activityFeedProvider(widget.boardId));
@@ -71,16 +76,13 @@ class _ActivityFeedState extends ConsumerState<ActivityFeed> {
                   _ActivityRow(
                     event: events[i],
                     isLast: i == events.length - 1,
-                  )
-                      .animate(delay: (i * 40).ms)
-                      .fadeIn(duration: 300.ms)
-                      .slideX(begin: 0.05, end: 0),
+                  ),
               ],
-            );
-          },
-        ),
-      ],
-    );
+            ).animate().fadeIn(duration: 250.ms);
+                      },
+                    ),
+                  ],
+                );
   }
 }
 
@@ -94,70 +96,62 @@ class _ActivityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Línea de tiempo
-          SizedBox(
-            width: 32,
-            child: Column(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.08),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      event.emoji,
-                      style: const TextStyle(fontSize: 14),
-                    ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 32,
+          child: Column(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    event.emoji,
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ),
-                if (!isLast)
-                  Expanded(
-                    child: Container(
-                      width: 1.5,
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      color: Colors.grey.shade200,
-                    ),
+              ),
+              if (!isLast)
+                Container(
+                  width: 1.5,
+                  height: 42,        // altura fija en lugar de Expanded
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  color: Colors.grey.shade200,
+                ),
+            ],
+          ),
+        ),
+        const Gap(10),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Gap(6),
+                Text(
+                  event.label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
+                const Gap(3),
+                Text(
+                  timeago.format(event.createdAt, locale: 'es'),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
               ],
             ),
           ),
-          const Gap(10),
-          // Contenido
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Gap(6),
-                  Text(
-                    event.label,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Gap(3),
-                  Text(
-                    timeago.format(event.createdAt, locale: 'es'),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -210,51 +204,42 @@ class _ActivitySkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: List.generate(
-        3,
-        (i) => Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const Gap(10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 12,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    const Gap(6),
-                    Container(
-                      height: 10,
-                      width: 80,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+  children: List.generate(
+    3,
+    (i) => Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              shape: BoxShape.circle,
+            ),
           ),
-        )
-            .animate(onPlay: (c) => c.repeat(reverse: true))
-            .shimmer(duration: 1200.ms, color: Colors.grey.shade100),
+          const Gap(10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 12,
+                  color: Colors.grey.shade200,
+                ),
+                const Gap(6),
+                Container(
+                  height: 10,
+                  width: 80,
+                  color: Colors.grey.shade100,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-    );
+    ),
+  ),
+);
   }
 }

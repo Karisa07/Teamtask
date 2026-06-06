@@ -111,6 +111,15 @@ final statsProvider =
   return repo.getBoardStats(boardId);
 });
 
+final boardMembersProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+  (ref, boardId) {
+    return ref
+        .read(boardRepositoryProvider)
+        .fetchBoardMembers(boardId);
+  },
+);
+
 // ── Acciones sobre tareas ─────────────────────────────────
 
 final taskActionsProvider =
